@@ -67,7 +67,11 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
       .order('orden')
 
     const { data: biblioteca } = await supabase
-      .from('cf_ejercicios').select('*').eq('profe_id', profeId).order('nombre')
+    .from('cf_ejercicios')
+    .select('*')
+    .or('profe_id.eq.' + profeId + ',es_global.eq.true')
+    .order('grupo_muscular')
+    .order('nombre')
 
     const semanasConEj: Semana[] = Array.from({ length: rutina.semanas_total }, (_, i) => {
       const semana = semanasData?.find(s => s.numero_semana === i + 1)
@@ -300,4 +304,4 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
       </div>
     </div>
   )
-}
+} 
