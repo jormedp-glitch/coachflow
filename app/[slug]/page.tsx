@@ -87,6 +87,7 @@ export default function DashboardPage({ params }: { params: Promise<{ slug: stri
           <button onClick={() => router.push(`/${slug}/alumnos`)} className="text-zinc-400 hover:text-white transition-colors">Alumnos</button>
           <button onClick={() => router.push(`/${slug}/rutinas`)} className="text-zinc-400 hover:text-white transition-colors">Rutinas</button>
           <button onClick={() => router.push(`/${slug}/turnos`)} className="text-zinc-400 hover:text-white transition-colors">Turnos</button>
+          <button onClick={() => router.push('/' + slug + '/pagos')} className="text-zinc-400 hover:text-white transition-colors">Pagos</button>
           <button onClick={() => { localStorage.clear(); router.push('/') }} className="text-zinc-600 hover:text-red-400 transition-colors">Salir</button>
         </div>
       </nav>

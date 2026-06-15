@@ -65,8 +65,7 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
       .from('cf_asignaciones')
       .select('*, rutina:cf_rutinas(id, nombre, semanas_total)')
       .eq('alumno_id', alumnoData.id)
-      .eq('activa', true)
-      .single()
+       .single()
 
     if (!asignacionData) { setLoading(false); return }
     setAsignacion(asignacionData)
