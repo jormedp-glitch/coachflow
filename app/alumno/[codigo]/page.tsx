@@ -300,6 +300,21 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
                   <p className="text-xs text-zinc-500 mb-1">Tu plan actual</p>
                   <p className="text-white font-medium">{asignacion.rutina.nombre}</p>
                   <p className="text-zinc-500 text-xs mt-1">{asignacion.rutina.semanas_total} semanas · Semana actual: {asignacion.semana_actual}</p>
+{asignacion.semana_actual < asignacion.rutina.semanas_total && (
+  <button
+    onClick={async () => {
+      await supabase.from('cf_asignaciones')
+        .update({ semana_actual: asignacion.semana_actual + 1 })
+        .eq('id', asignacion.id)
+      cargarDatos()
+    }}
+    className="mt-2 text-xs text-violet-400 hover:text-violet-300 border border-violet-800 hover:border-violet-600 px-3 py-1 rounded-lg transition-colors">
+    ▶ Avanzar a semana {asignacion.semana_actual + 1}
+  </button>
+)}
+{asignacion.semana_actual === asignacion.rutina.semanas_total && (
+  <p className="text-xs text-emerald-400 mt-2">🎉 ¡Completaste todas las semanas del plan!</p>
+)}
                   {totalEj > 0 && (
                     <div className="mt-3">
                       <div className="flex justify-between text-xs mb-1">
