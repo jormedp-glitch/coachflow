@@ -18,6 +18,14 @@ interface Alumno {
   telefono: string
 }
 
+interface AlumnoVencido {
+  id: string
+  nombre: string
+  telefono: string
+  diasVencido: number
+  ultimoPago: string | null
+}
+
 const MEDIOS = ['efectivo', 'transferencia', 'mercadopago', 'otro']
 const MEDIO_COLORS: Record<string, string> = {
   efectivo:      'bg-green-900/40 text-green-400',
@@ -32,6 +40,7 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
   const [pagos, setPagos] = React.useState<Pago[]>([])
   const [alumnos, setAlumnos] = React.useState<Alumno[]>([])
   const [alumnosMap, setAlumnosMap] = React.useState<Record<string, Alumno>>({})
+  const [alumnosVencidos, setAlumnosVencidos] = React.useState<AlumnoVencido[]>([])
   const [loading, setLoading] = React.useState(true)
   const [mostrarForm, setMostrarForm] = React.useState(false)
   const [guardando, setGuardando] = React.useState(false)
@@ -54,7 +63,8 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
     if (!profeId) return
 
     const { data: aData } = await supabase
-      .from('cf_alumnos').select('id, nombre, telefono').eq('profe_id', profeId).order('nombre')
+      .from('cf_alumnos').select('id, nombre, telefono')
+      .eq('profe_id', profeId).eq('estado', 'activo').order('nombre')
 
     setAlumnos(aData || [])
     const map: Record<string, Alumno> = {}
@@ -63,8 +73,39 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
 
     const { data: pData } = await supabase
       .from('cf_pagos').select('*').eq('profe_id', profeId).order('fecha', { ascending: false })
-
     setPagos(pData || [])
+
+    // Calcular alumnos con cuota vencida
+    if (aData && aData.length > 0) {
+      const alumnoIds = aData.map((a: Alumno) => a.id)
+      const { data: pagosAlumnos } = await supabase
+        .from('cf_pagos').select('alumno_id, fecha')
+        .in('alumno_id', alumnoIds).order('fecha', { ascending: false })
+
+      const ultimoPagoMap: Record<string, string> = {}
+      ;(pagosAlumnos || []).forEach((p: any) => {
+        if (!ultimoPagoMap[p.alumno_id]) ultimoPagoMap[p.alumno_id] = p.fecha
+      })
+
+      const ahora = new Date()
+      const vencidos: AlumnoVencido[] = []
+      ;(aData || []).forEach((a: Alumno) => {
+        const ultimoPago = ultimoPagoMap[a.id] || null
+        let diasVencido = 0
+        if (!ultimoPago) {
+          diasVencido = 999
+        } else {
+          const fechaPago = new Date(ultimoPago + 'T12:00:00')
+          diasVencido = Math.floor((ahora.getTime() - fechaPago.getTime()) / (1000 * 60 * 60 * 24))
+        }
+        if (diasVencido > 35) {
+          vencidos.push({ id: a.id, nombre: a.nombre, telefono: a.telefono, diasVencido, ultimoPago })
+        }
+      })
+      vencidos.sort((a, b) => b.diasVencido - a.diasVencido)
+      setAlumnosVencidos(vencidos)
+    }
+
     setLoading(false)
   }
 
@@ -111,6 +152,16 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
     if (editandoPago === p.id) { setEditandoPago(null); return }
     setEditandoPago(p.id)
     setFormEdit({ monto: String(p.monto), concepto: p.concepto || '', medio_pago: p.medio_pago, fecha: p.fecha })
+  }
+
+  function linkWACobro(alumno: Alumno) {
+    const msg = 'Hola ' + alumno.nombre + ', te recuerdo que tu cuota está vencida. ¿Cuándo podés renovar? 🙏'
+    return 'https://wa.me/54' + alumno.telefono + '?text=' + encodeURIComponent(msg)
+  }
+
+  function diasTexto(dias: number) {
+    if (dias >= 999) return 'Sin pagos registrados'
+    return dias + ' días vencido'
   }
 
   const pagosFiltrados = filtroAlumno ? pagos.filter(p => p.alumno_id === filtroAlumno) : pagos
@@ -161,6 +212,7 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
           </button>
         </div>
 
+        {/* KPIs */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
             <p className="text-zinc-500 text-xs mb-1">Cobrado este mes</p>
@@ -172,6 +224,37 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
           </div>
         </div>
 
+        {/* Alumnos con cuota vencida */}
+        {alumnosVencidos.length > 0 && (
+          <div className="bg-zinc-900 border border-red-900/40 rounded-xl p-5 mb-6">
+            <h2 className="text-sm font-medium text-red-400 mb-3">⚠️ Cuotas vencidas ({alumnosVencidos.length})</h2>
+            <div className="space-y-2">
+              {alumnosVencidos.map(a => (
+                <div key={a.id} className="flex items-center justify-between py-2 border-b border-zinc-800 last:border-0">
+                  <div>
+                    <p className="text-sm text-white">{a.nombre}</p>
+                    <p className="text-xs text-red-400/70">{diasTexto(a.diasVencido)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setForm({ ...form, alumno_id: a.id }); setMostrarForm(true) }}
+                      className="text-xs text-violet-400 hover:text-violet-300 px-2 py-1 rounded border border-violet-800 hover:border-violet-600 transition-colors">
+                      + Pago
+                    </button>
+                    {a.telefono && (
+                      <a href={linkWACobro(a)} target="_blank" rel="noopener noreferrer"
+                        className="text-xs bg-green-900/40 text-green-400 hover:bg-green-900/60 px-3 py-1.5 rounded-lg transition-colors">
+                        WA cobro
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Formulario nuevo pago */}
         {mostrarForm && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6 space-y-4">
             <h2 className="text-sm font-medium text-zinc-300">Registrar pago</h2>
@@ -187,7 +270,7 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
               <div>
                 <label className="text-zinc-500 text-xs mb-1 block">Monto *</label>
                 <input type="number" value={form.monto} onChange={e => setForm({ ...form, monto: e.target.value })}
-                  className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none focus:border-zinc-500" placeholder="15000" />
+                  className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none" placeholder="15000" />
               </div>
               <div>
                 <label className="text-zinc-500 text-xs mb-1 block">Medio de pago</label>
@@ -199,7 +282,7 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
               <div>
                 <label className="text-zinc-500 text-xs mb-1 block">Concepto</label>
                 <input type="text" value={form.concepto} onChange={e => setForm({ ...form, concepto: e.target.value })}
-                  className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none focus:border-zinc-500" placeholder="Cuota junio, sesión, etc." />
+                  className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none" placeholder="Cuota junio, sesión, etc." />
               </div>
               <div>
                 <label className="text-zinc-500 text-xs mb-1 block">Fecha *</label>
@@ -217,6 +300,7 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
           </div>
         )}
 
+        {/* Filtro */}
         <div className="mb-4">
           <select value={filtroAlumno} onChange={e => setFiltroAlumno(e.target.value)}
             className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none">
@@ -225,6 +309,7 @@ export default function PagosPage({ params }: { params: Promise<{ slug: string }
           </select>
         </div>
 
+        {/* Lista de pagos */}
         <div className="space-y-2">
           {pagosFiltrados.length === 0 ? (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">

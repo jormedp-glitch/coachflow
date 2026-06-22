@@ -17,6 +17,13 @@ interface Alumno {
   telefono: string
 }
 
+interface Asignacion {
+  id: string
+  alumno_id: string
+  semana_actual: number
+  rutina: { semanas_total: number; nombre: string }
+}
+
 const ESTADOS = ['pendiente', 'confirmado', 'completado', 'cancelado']
 const ESTADO_COLORS: Record<string, string> = {
   pendiente:  'bg-yellow-900/40 text-yellow-400',
@@ -31,9 +38,11 @@ export default function TurnosPage({ params }: { params: Promise<{ slug: string 
   const [turnos, setTurnos] = React.useState<Turno[]>([])
   const [alumnos, setAlumnos] = React.useState<Alumno[]>([])
   const [alumnosMap, setAlumnosMap] = React.useState<Record<string, Alumno>>({})
+  const [asignacionesMap, setAsignacionesMap] = React.useState<Record<string, Asignacion>>({})
   const [loading, setLoading] = React.useState(true)
   const [mostrarForm, setMostrarForm] = React.useState(false)
   const [guardando, setGuardando] = React.useState(false)
+  const [avanzando, setAvanzando] = React.useState<string | null>(null)
   const [vista, setVista] = React.useState<'hoy' | 'semana' | 'todos'>('hoy')
   const [editandoTurno, setEditandoTurno] = React.useState<string | null>(null)
   const [formEdit, setFormEdit] = React.useState({ fecha: '', hora: '', espacio: '' })
@@ -59,6 +68,18 @@ export default function TurnosPage({ params }: { params: Promise<{ slug: string 
     const map: Record<string, Alumno> = {}
     ;(aData || []).forEach((a: Alumno) => { map[a.id] = a })
     setAlumnosMap(map)
+
+    // Cargar asignaciones para avance de semana
+    if (aData && aData.length > 0) {
+      const alumnoIds = aData.map((a: Alumno) => a.id)
+      const { data: asigData } = await supabase
+        .from('cf_asignaciones')
+        .select('id, alumno_id, semana_actual, rutina:cf_rutinas(semanas_total, nombre)')
+        .in('alumno_id', alumnoIds)
+      const asigMap: Record<string, Asignacion> = {}
+      ;(asigData || []).forEach((a: any) => { asigMap[a.alumno_id] = a })
+      setAsignacionesMap(asigMap)
+    }
 
     const hoy = new Date()
     hoy.setHours(0, 0, 0, 0)
@@ -120,6 +141,22 @@ export default function TurnosPage({ params }: { params: Promise<{ slug: string 
     cargarDatos()
   }
 
+  async function avanzarSemana(alumnoId: string) {
+    const asig = asignacionesMap[alumnoId]
+    if (!asig) return
+    if (asig.semana_actual >= asig.rutina.semanas_total) {
+      alert('El alumno ya está en la última semana del plan (' + asig.rutina.semanas_total + ' semanas).')
+      return
+    }
+    if (!confirm('¿Avanzar a la semana ' + (asig.semana_actual + 1) + ' de ' + asig.rutina.semanas_total + '?')) return
+    setAvanzando(alumnoId)
+    await supabase.from('cf_asignaciones')
+      .update({ semana_actual: asig.semana_actual + 1 })
+      .eq('id', asig.id)
+    await cargarDatos()
+    setAvanzando(null)
+  }
+
   function abrirEditar(t: Turno) {
     if (editandoTurno === t.id) { setEditandoTurno(null); return }
     const d = new Date(t.fecha_hora)
@@ -139,9 +176,15 @@ export default function TurnosPage({ params }: { params: Promise<{ slug: string 
     }
   }
 
-  function linkWA(alumno: Alumno, turno: Turno) {
+  function linkWAConfirmacion(alumno: Alumno, turno: Turno) {
     const { fecha, hora } = formatFechaHora(turno.fecha_hora)
     const msg = 'Hola ' + alumno.nombre + ', te confirmo tu turno el ' + fecha + ' a las ' + hora + 'hs' + (turno.espacio ? ' en ' + turno.espacio : '') + '. Te espero!'
+    return 'https://wa.me/54' + alumno.telefono + '?text=' + encodeURIComponent(msg)
+  }
+
+  function linkWARecordatorio(alumno: Alumno, turno: Turno) {
+    const { fecha, hora } = formatFechaHora(turno.fecha_hora)
+    const msg = 'Hola ' + alumno.nombre + ', te recuerdo tu turno el ' + fecha + ' a las ' + hora + 'hs' + (turno.espacio ? ' en ' + turno.espacio : '') + '. ¿Confirmás asistencia?'
     return 'https://wa.me/54' + alumno.telefono + '?text=' + encodeURIComponent(msg)
   }
 
@@ -210,7 +253,7 @@ export default function TurnosPage({ params }: { params: Promise<{ slug: string 
               <div className="col-span-2">
                 <label className="text-zinc-500 text-xs mb-1 block">Espacio / Lugar</label>
                 <input type="text" value={form.espacio} onChange={e => setForm({ ...form, espacio: e.target.value })}
-                  className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none focus:border-zinc-500"
+                  className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none"
                   placeholder="Club Atlético, Cancha Norte, Online..." />
               </div>
             </div>
@@ -235,6 +278,7 @@ export default function TurnosPage({ params }: { params: Promise<{ slug: string 
             turnos.map(t => {
               const { fecha, hora } = formatFechaHora(t.fecha_hora)
               const alumno = alumnosMap[t.alumno_id]
+              const asig = asignacionesMap[t.alumno_id]
               return (
                 <div key={t.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                   <div className="p-4 flex items-center justify-between">
@@ -246,18 +290,37 @@ export default function TurnosPage({ params }: { params: Promise<{ slug: string 
                       <div>
                         <p className="text-sm font-medium text-white">{alumno?.nombre || '—'}</p>
                         <p className="text-xs text-zinc-500">{t.espacio || 'Sin lugar especificado'}</p>
+                        {asig && (
+                          <p className="text-xs text-violet-400/70 mt-0.5">
+                            {asig.rutina.nombre} · Semana {asig.semana_actual}/{asig.rutina.semanas_total}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
                       <select value={t.estado} onChange={e => cambiarEstado(t.id, e.target.value)}
                         className={`text-xs px-2 py-1 rounded-full cursor-pointer focus:outline-none border-0 ${ESTADO_COLORS[t.estado] || 'bg-zinc-800 text-zinc-400'}`}>
                         {ESTADOS.map(e => <option key={e} value={e} className="bg-zinc-800 text-white">{e}</option>)}
                       </select>
                       {alumno?.telefono && (
-                        <a href={linkWA(alumno, t)} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-green-400 hover:text-green-300 px-2 py-1 rounded border border-zinc-700 hover:border-zinc-600 transition-colors">
-                          WA
-                        </a>
+                        <>
+                          <a href={linkWAConfirmacion(alumno, t)} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-green-400 hover:text-green-300 px-2 py-1 rounded border border-zinc-700 hover:border-zinc-600 transition-colors">
+                            Confirmar
+                          </a>
+                          <a href={linkWARecordatorio(alumno, t)} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded border border-zinc-700 hover:border-zinc-600 transition-colors">
+                            Recordar
+                          </a>
+                        </>
+                      )}
+                      {asig && asig.semana_actual < asig.rutina.semanas_total && (
+                        <button
+                          onClick={() => avanzarSemana(t.alumno_id)}
+                          disabled={avanzando === t.alumno_id}
+                          className="text-xs text-violet-400 hover:text-violet-300 px-2 py-1 rounded border border-violet-800 hover:border-violet-600 transition-colors disabled:opacity-50">
+                          {avanzando === t.alumno_id ? '...' : '▶ Sem ' + (asig.semana_actual + 1)}
+                        </button>
                       )}
                       <button onClick={() => abrirEditar(t)}
                         className={`text-xs px-2 py-1 rounded border transition-colors ${editandoTurno === t.id ? 'text-violet-300 border-violet-700' : 'text-zinc-400 hover:text-white border-zinc-700'}`}>
