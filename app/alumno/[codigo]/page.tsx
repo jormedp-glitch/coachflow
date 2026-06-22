@@ -30,6 +30,7 @@ interface Alumno {
   id: string
   nombre: string
   objetivo: string
+  altura_cm: number | null
   profe: { nombre: string; deporte: string }
 }
 
@@ -46,7 +47,38 @@ interface Progreso {
   peso: number
   cintura: number
   cadera: number
+  porcentaje_grasa: number
+  pecho_cm: number
+  bicep_cm: number
+  metrica1_nombre: string
+  metrica1_valor: number
+  metrica2_nombre: string
+  metrica2_valor: number
   notas: string
+}
+
+interface Pago {
+  id: string
+  fecha: string
+  monto: number
+  concepto: string
+  medio_pago: string
+}
+
+interface DiaCompletado {
+  fecha: string
+  cantidad: number
+}
+
+function calcularIMC(peso: number, altura_cm: number | null): { valor: number; categoria: string; color: string } | null {
+  if (!altura_cm || !peso) return null
+  const altura_m = altura_cm / 100
+  const imc = peso / (altura_m * altura_m)
+  const valor = Math.round(imc * 10) / 10
+  if (imc < 18.5) return { valor, categoria: 'Bajo peso', color: 'text-blue-400' }
+  if (imc < 25) return { valor, categoria: 'Normal', color: 'text-green-400' }
+  if (imc < 30) return { valor, categoria: 'Sobrepeso', color: 'text-yellow-400' }
+  return { valor, categoria: 'Obesidad', color: 'text-red-400' }
 }
 
 export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo: string }> }) {
@@ -57,10 +89,12 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
   const [semanaVista, setSemanaVista] = React.useState(1)
   const [completados, setCompletados] = React.useState<Set<string>>(new Set())
   const [progreso, setProgreso] = React.useState<Progreso[]>([])
+  const [pagos, setPagos] = React.useState<Pago[]>([])
+  const [diasCompletados, setDiasCompletados] = React.useState<DiaCompletado[]>([])
   const [ultimoPago, setUltimoPago] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [noEncontrado, setNoEncontrado] = React.useState(false)
-  const [seccion, setSeccion] = React.useState<'rutina' | 'progreso'>('rutina')
+  const [seccion, setSeccion] = React.useState<'rutina' | 'historial' | 'progreso' | 'pagos'>('rutina')
 
   React.useEffect(() => { cargarDatos() }, [codigo])
 
@@ -103,19 +137,32 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
       }))
       setSemanas(semanasConEj)
 
-      // Cargar completados de hoy
       const hoy = new Date().toISOString().split('T')[0]
       const { data: compData } = await supabase
         .from('cf_completados')
         .select('rutina_ejercicio_id')
         .eq('alumno_id', alumnoData.id)
         .eq('fecha', hoy)
-
       const set = new Set((compData || []).map((c: any) => c.rutina_ejercicio_id))
       setCompletados(set)
+
+      // Historial de días con entrenamientos completados
+      const { data: historialComp } = await supabase
+        .from('cf_completados')
+        .select('fecha')
+        .eq('alumno_id', alumnoData.id)
+        .order('fecha', { ascending: false })
+
+      const diasMap: Record<string, number> = {}
+      ;(historialComp || []).forEach((c: any) => {
+        diasMap[c.fecha] = (diasMap[c.fecha] || 0) + 1
+      })
+      const dias: DiaCompletado[] = Object.entries(diasMap)
+        .map(([fecha, cantidad]) => ({ fecha, cantidad }))
+        .sort((a, b) => b.fecha.localeCompare(a.fecha))
+      setDiasCompletados(dias)
     }
 
-    // Cargar progreso físico
     const { data: progData } = await supabase
       .from('cf_progreso')
       .select('*')
@@ -123,15 +170,14 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
       .order('fecha', { ascending: false })
     setProgreso(progData || [])
 
-    // Cargar último pago
-    const { data: pagoData } = await supabase
+    // Pagos del alumno
+    const { data: pagosData } = await supabase
       .from('cf_pagos')
-      .select('fecha, monto, concepto')
+      .select('*')
       .eq('alumno_id', alumnoData.id)
       .order('fecha', { ascending: false })
-      .limit(1)
-      .single()
-    if (pagoData) setUltimoPago(pagoData.fecha)
+    setPagos(pagosData || [])
+    if (pagosData && pagosData.length > 0) setUltimoPago(pagosData[0].fecha)
 
     setLoading(false)
   }
@@ -162,6 +208,10 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
 
   function formatFecha(fecha: string) {
     return new Date(fecha + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  function formatPesos(n: number) {
+    return '$' + Number(n).toLocaleString('es-AR')
   }
 
   function estadoPago() {
@@ -203,7 +253,7 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
           </div>
           <div className="text-right">
             <p className="text-white text-sm font-medium">{alumno?.nombre}</p>
-            <p className="text-zinc-500 text-xs">{alumno?.profe?.nombre} · {alumno?.profe?.deporte}</p>
+            <p className="text-zinc-500 text-xs">{alumno?.profe?.nombre}{alumno?.profe?.deporte ? ' · ' + alumno.profe.deporte : ''}</p>
           </div>
         </div>
       </div>
@@ -211,28 +261,37 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
       <div className="max-w-2xl mx-auto px-4 py-6">
 
         {/* Estado de pago */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 mb-5 flex items-center justify-between">
+        <div className={'border rounded-xl px-4 py-3 mb-5 flex items-center justify-between ' + (pago.color === 'text-red-400' ? 'bg-red-950/20 border-red-900/40' : 'bg-zinc-900 border-zinc-800')}>
           <p className="text-xs text-zinc-500">Estado de cuenta</p>
           <p className={'text-xs font-medium ' + pago.color}>{pago.texto}</p>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-5">
+        <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
           <button onClick={() => setSeccion('rutina')}
-            className={'px-4 py-2 rounded-lg text-sm font-medium transition-colors ' + (seccion === 'rutina' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400')}>
-            Mi rutina
+            className={'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ' + (seccion === 'rutina' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400')}>
+            Mi plan
+          </button>
+          <button onClick={() => setSeccion('historial')}
+            className={'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ' + (seccion === 'historial' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400')}>
+            Historial {diasCompletados.length > 0 && '(' + diasCompletados.length + ')'}
           </button>
           <button onClick={() => setSeccion('progreso')}
-            className={'px-4 py-2 rounded-lg text-sm font-medium transition-colors ' + (seccion === 'progreso' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400')}>
+            className={'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ' + (seccion === 'progreso' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400')}>
             Mi progreso {progreso.length > 0 && '(' + progreso.length + ')'}
+          </button>
+          <button onClick={() => setSeccion('pagos')}
+            className={'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ' + (seccion === 'pagos' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400')}>
+            Mis pagos {pagos.length > 0 && '(' + pagos.length + ')'}
           </button>
         </div>
 
+        {/* TAB: MI PLAN */}
         {seccion === 'rutina' && (
           <>
             {!asignacion ? (
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
-                <p className="text-zinc-400 text-sm">Tu profe todavia no te asigno una rutina.</p>
+                <p className="text-zinc-400 text-sm">Tu profe todavia no te asigno un plan.</p>
                 <p className="text-zinc-600 text-xs mt-2">Volvé a consultar pronto.</p>
               </div>
             ) : (
@@ -245,7 +304,7 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
                     <div className="mt-3">
                       <div className="flex justify-between text-xs mb-1">
                         <span className="text-zinc-500">Hoy completaste</span>
-                        <span className="text-violet-400">{ejCompletadosHoy}/{totalEj} ejercicios</span>
+                        <span className="text-violet-400">{ejCompletadosHoy}/{totalEj} actividades</span>
                       </div>
                       <div className="w-full bg-zinc-800 rounded-full h-1.5">
                         <div className="bg-violet-500 h-1.5 rounded-full transition-all"
@@ -269,7 +328,7 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
                 <div className="space-y-3">
                   {!semanaActual || semanaActual.ejercicios.length === 0 ? (
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center">
-                      <p className="text-zinc-500 text-sm">Sin ejercicios en esta semana todavia.</p>
+                      <p className="text-zinc-500 text-sm">Sin actividades en esta semana todavia.</p>
                     </div>
                   ) : (
                     semanaActual.ejercicios.map((ej, idx) => {
@@ -289,15 +348,15 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
                                 <div className="flex gap-3 mt-2">
                                   <div className="text-center">
                                     <p className="text-violet-400 font-semibold text-lg">{ej.series}</p>
-                                    <p className="text-zinc-500 text-xs">series</p>
+                                    <p className="text-zinc-500 text-xs">cantidad</p>
                                   </div>
                                   <div className="text-center">
                                     <p className="text-violet-400 font-semibold text-lg">{ej.repeticiones}</p>
-                                    <p className="text-zinc-500 text-xs">reps</p>
+                                    <p className="text-zinc-500 text-xs">detalle</p>
                                   </div>
                                   <div className="text-center">
                                     <p className="text-violet-400 font-semibold text-lg">{ej.descanso_seg}s</p>
-                                    <p className="text-zinc-500 text-xs">descanso</p>
+                                    <p className="text-zinc-500 text-xs">duración</p>
                                   </div>
                                 </div>
                                 {ej.notas && <p className="text-zinc-500 text-xs mt-2 italic">{ej.notas}</p>}
@@ -336,46 +395,166 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
           </>
         )}
 
-        {seccion === 'progreso' && (
+        {/* TAB: HISTORIAL */}
+        {seccion === 'historial' && (
           <div className="space-y-3">
+            {diasCompletados.length === 0 ? (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
+                <p className="text-zinc-400 text-sm">Todavia no completaste ningún entrenamiento.</p>
+                <p className="text-zinc-600 text-xs mt-1">Marcá tus actividades como hechas y aparecen acá.</p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between mb-2">
+                  <p className="text-xs text-zinc-500">Total de días entrenados</p>
+                  <p className="text-lg font-semibold text-violet-400">{diasCompletados.length} días</p>
+                </div>
+                {diasCompletados.map(d => (
+                  <div key={d.fecha} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-violet-900/40 flex items-center justify-center">
+                        <span className="text-violet-400 text-sm">✓</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white">{formatFecha(d.fecha)}</p>
+                        <p className="text-xs text-zinc-500">{d.cantidad} {d.cantidad === 1 ? 'actividad completada' : 'actividades completadas'}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      {Array.from({ length: Math.min(d.cantidad, 5) }).map((_, i) => (
+                        <div key={i} className="w-2 h-2 rounded-full bg-violet-500" />
+                      ))}
+                      {d.cantidad > 5 && <span className="text-xs text-zinc-500 ml-1">+{d.cantidad - 5}</span>}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* TAB: MI PROGRESO */}
+        {seccion === 'progreso' && (
+          <div className="space-y-4">
             {progreso.length === 0 ? (
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
                 <p className="text-zinc-400 text-sm">Tu profe todavia no cargo mediciones.</p>
                 <p className="text-zinc-600 text-xs mt-1">Las mediciones aparecen aca cuando tu profe las registra.</p>
               </div>
             ) : (
-              progreso.map((p, idx) => (
-                <div key={p.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs text-zinc-500">{formatFecha(p.fecha)}</p>
-                    {idx === 0 && <span className="text-xs bg-violet-900/40 text-violet-400 px-2 py-0.5 rounded-full">Ultima medicion</span>}
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {p.peso && (
-                      <div className="text-center">
-                        <p className="text-white font-semibold text-lg">{p.peso}kg</p>
-                        <p className="text-zinc-500 text-xs">Peso</p>
+              <>
+                {alumno?.altura_cm && progreso[0]?.peso && (() => {
+                  const imc = calcularIMC(progreso[0].peso, alumno.altura_cm)
+                  if (!imc) return null
+                  return (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                      <p className="text-xs text-zinc-500 mb-3">Tu índice de masa corporal</p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className={'text-4xl font-semibold ' + imc.color}>{imc.valor}</p>
+                          <p className={'text-sm mt-1 ' + imc.color}>{imc.categoria}</p>
+                        </div>
+                        <div className="text-right text-xs text-zinc-500">
+                          <p>Altura: {alumno.altura_cm}cm</p>
+                          <p>Peso actual: {progreso[0].peso}kg</p>
+                          <p className="mt-1">Última medición</p>
+                          <p>{formatFecha(progreso[0].fecha)}</p>
+                        </div>
                       </div>
-                    )}
-                    {p.cintura && (
-                      <div className="text-center">
-                        <p className="text-white font-semibold text-lg">{p.cintura}cm</p>
-                        <p className="text-zinc-500 text-xs">Cintura</p>
+                      <div className="mt-4">
+                        <div className="flex text-xs text-zinc-600 justify-between mb-1">
+                          <span>16</span><span>18.5</span><span>25</span><span>30</span><span>40</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gradient-to-r from-blue-500 via-green-500 via-yellow-400 to-red-500 relative">
+                          <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border-2 border-zinc-900 shadow"
+                            style={{ left: Math.min(Math.max((imc.valor - 16) / (40 - 16) * 100, 2), 98) + '%', transform: 'translate(-50%, -50%)' }} />
+                        </div>
+                        <div className="flex text-xs justify-between mt-1">
+                          <span className="text-blue-400">Bajo</span>
+                          <span className="text-green-400">Normal</span>
+                          <span className="text-yellow-400">Sobre</span>
+                          <span className="text-red-400">Obesidad</span>
+                        </div>
                       </div>
-                    )}
-                    {p.cadera && (
-                      <div className="text-center">
-                        <p className="text-white font-semibold text-lg">{p.cadera}cm</p>
-                        <p className="text-zinc-500 text-xs">Cadera</p>
+                    </div>
+                  )
+                })()}
+
+                {progreso.length >= 2 && progreso[0].peso && progreso[1].peso && (() => {
+                  const diff = Math.round((progreso[0].peso - progreso[1].peso) * 10) / 10
+                  const positivo = diff < 0
+                  return (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
+                      <p className="text-xs text-zinc-500">Variación de peso</p>
+                      <p className={'text-sm font-medium ' + (positivo ? 'text-green-400' : diff > 0 ? 'text-red-400' : 'text-zinc-400')}>
+                        {diff > 0 ? '+' : ''}{diff}kg desde la medición anterior
+                      </p>
+                    </div>
+                  )
+                })()}
+
+                {progreso.map((p, idx) => {
+                  const imc = calcularIMC(p.peso, alumno?.altura_cm || null)
+                  return (
+                    <div key={p.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-zinc-500">{formatFecha(p.fecha)}</p>
+                        {idx === 0 && <span className="text-xs bg-violet-900/40 text-violet-400 px-2 py-0.5 rounded-full">Última medición</span>}
                       </div>
-                    )}
-                  </div>
-                  {p.notas && <p className="text-zinc-500 text-xs mt-3 italic">{p.notas}</p>}
-                </div>
-              ))
+                      <div className="flex flex-wrap gap-x-5 gap-y-3">
+                        {p.peso && <div className="text-center"><p className="text-white font-semibold text-lg">{p.peso}kg</p><p className="text-zinc-500 text-xs">Peso</p></div>}
+                        {imc && <div className="text-center"><p className={'font-semibold text-lg ' + imc.color}>{imc.valor}</p><p className="text-zinc-500 text-xs">IMC</p></div>}
+                        {p.cintura && <div className="text-center"><p className="text-white font-semibold text-lg">{p.cintura}cm</p><p className="text-zinc-500 text-xs">Cintura</p></div>}
+                        {p.cadera && <div className="text-center"><p className="text-white font-semibold text-lg">{p.cadera}cm</p><p className="text-zinc-500 text-xs">Cadera</p></div>}
+                        {p.pecho_cm && <div className="text-center"><p className="text-white font-semibold text-lg">{p.pecho_cm}cm</p><p className="text-zinc-500 text-xs">Pecho</p></div>}
+                        {p.bicep_cm && <div className="text-center"><p className="text-white font-semibold text-lg">{p.bicep_cm}cm</p><p className="text-zinc-500 text-xs">Bícep</p></div>}
+                        {p.porcentaje_grasa && <div className="text-center"><p className="text-white font-semibold text-lg">{p.porcentaje_grasa}%</p><p className="text-zinc-500 text-xs">% Grasa</p></div>}
+                        {p.metrica1_nombre && p.metrica1_valor && <div className="text-center"><p className="text-white font-semibold text-lg">{p.metrica1_valor}</p><p className="text-zinc-500 text-xs">{p.metrica1_nombre}</p></div>}
+                        {p.metrica2_nombre && p.metrica2_valor && <div className="text-center"><p className="text-white font-semibold text-lg">{p.metrica2_valor}</p><p className="text-zinc-500 text-xs">{p.metrica2_nombre}</p></div>}
+                      </div>
+                      {p.notas && <p className="text-zinc-500 text-xs mt-3 italic">{p.notas}</p>}
+                    </div>
+                  )
+                })}
+              </>
             )}
           </div>
         )}
+
+        {/* TAB: MIS PAGOS */}
+        {seccion === 'pagos' && (
+          <div className="space-y-3">
+            {pagos.length === 0 ? (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
+                <p className="text-zinc-400 text-sm">Sin pagos registrados todavia.</p>
+                <p className="text-zinc-600 text-xs mt-1">Los pagos aparecen aca cuando tu profe los registra.</p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
+                  <p className="text-xs text-zinc-500">Total pagado</p>
+                  <p className="text-lg font-semibold text-emerald-400">
+                    {formatPesos(pagos.reduce((acc, p) => acc + Number(p.monto), 0))}
+                  </p>
+                </div>
+                {pagos.map((p, idx) => (
+                  <div key={p.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white">{p.concepto || 'Cuota'}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-zinc-500">{formatFecha(p.fecha)}</p>
+                        {p.medio_pago && <span className="text-xs bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">{p.medio_pago}</span>}
+                        {idx === 0 && <span className="text-xs bg-emerald-900/40 text-emerald-400 px-1.5 py-0.5 rounded">último</span>}
+                      </div>
+                    </div>
+                    <p className="text-emerald-400 font-medium">{formatPesos(p.monto)}</p>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   )

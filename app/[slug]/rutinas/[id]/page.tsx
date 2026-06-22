@@ -67,11 +67,11 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
       .order('orden')
 
     const { data: biblioteca } = await supabase
-    .from('cf_ejercicios')
-    .select('*')
-    .or('profe_id.eq.' + profeId + ',es_global.eq.true')
-    .order('grupo_muscular')
-    .order('nombre')
+      .from('cf_ejercicios')
+      .select('*')
+      .or('profe_id.eq.' + profeId + ',es_global.eq.true')
+      .order('grupo_muscular')
+      .order('nombre')
 
     const semanasConEj: Semana[] = Array.from({ length: rutina.semanas_total }, (_, i) => {
       const semana = semanasData?.find(s => s.numero_semana === i + 1)
@@ -180,17 +180,17 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
             <h2 className="text-sm font-medium text-zinc-300">Semana {semanaActiva}</h2>
             <button onClick={() => { setMostrarSelector(!mostrarSelector); setEditandoEj(null) }}
               className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-              + Agregar ejercicio
+              + Agregar actividad
             </button>
           </div>
 
           {mostrarSelector && (
             <div className="bg-zinc-800 rounded-xl p-4 mb-4 space-y-3">
               <div>
-                <label className="text-zinc-500 text-xs mb-1 block">Ejercicio de la biblioteca</label>
+                <label className="text-zinc-500 text-xs mb-1 block">Actividad de la biblioteca</label>
                 <select value={formEj.ejercicio_id} onChange={e => setFormEj({ ...formEj, ejercicio_id: e.target.value })}
                   className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none">
-                  <option value="">Seleccionar ejercicio...</option>
+                  <option value="">Seleccionar actividad...</option>
                   {ejerciciosBiblioteca.map(e => (
                     <option key={e.id} value={e.id}>{e.nombre}{e.grupo_muscular ? ' · ' + e.grupo_muscular : ''}</option>
                   ))}
@@ -198,17 +198,17 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-zinc-500 text-xs mb-1 block">Series</label>
+                  <label className="text-zinc-500 text-xs mb-1 block">Cantidad</label>
                   <input type="number" value={formEj.series} onChange={e => setFormEj({ ...formEj, series: Number(e.target.value) })}
                     className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" min={1} max={10} />
                 </div>
                 <div>
-                  <label className="text-zinc-500 text-xs mb-1 block">Repeticiones</label>
+                  <label className="text-zinc-500 text-xs mb-1 block">Detalle</label>
                   <input type="text" value={formEj.repeticiones} onChange={e => setFormEj({ ...formEj, repeticiones: e.target.value })}
                     className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" placeholder="10 o 8-12" />
                 </div>
                 <div>
-                  <label className="text-zinc-500 text-xs mb-1 block">Descanso (seg)</label>
+                  <label className="text-zinc-500 text-xs mb-1 block">Duración (seg)</label>
                   <input type="number" value={formEj.descanso_seg} onChange={e => setFormEj({ ...formEj, descanso_seg: Number(e.target.value) })}
                     className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" min={0} step={15} />
                 </div>
@@ -216,7 +216,7 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
               <div>
                 <label className="text-zinc-500 text-xs mb-1 block">Notas</label>
                 <input type="text" value={formEj.notas} onChange={e => setFormEj({ ...formEj, notas: e.target.value })}
-                  className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" placeholder="Peso sugerido, tecnica especial..." />
+                  className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" placeholder="Indicaciones, peso sugerido..." />
               </div>
               <div className="flex gap-3">
                 <button onClick={agregarEjercicio} disabled={guardando || !formEj.ejercicio_id}
@@ -229,19 +229,18 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
           )}
 
           {!semanaActual || semanaActual.ejercicios.length === 0 ? (
-            <p className="text-zinc-600 text-sm">Sin ejercicios en esta semana. Agrega el primero!</p>
+            <p className="text-zinc-600 text-sm">Sin actividades en esta semana. ¡Agregá la primera!</p>
           ) : (
             <div className="space-y-1">
               {semanaActual.ejercicios.map((ej, idx) => (
                 <div key={ej.id} className="rounded-lg overflow-hidden">
-                  {/* Fila del ejercicio */}
                   <div className="flex items-center justify-between py-3 px-2 border-b border-zinc-800">
                     <div className="flex items-center gap-3">
                       <span className="text-zinc-600 text-xs w-5">{idx + 1}</span>
                       <div>
                         <p className="text-sm font-medium text-white">{ej.ejercicio?.nombre}</p>
                         <p className="text-xs text-zinc-500">
-                          {ej.series} series · {ej.repeticiones} reps · {ej.descanso_seg}s descanso
+                          {ej.series} cant. · {ej.repeticiones} det. · {ej.descanso_seg}s dur.
                           {ej.notas && ' · ' + ej.notas}
                         </p>
                       </div>
@@ -262,22 +261,21 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
                     </div>
                   </div>
 
-                  {/* Panel de edición inline */}
                   {editandoEj === ej.id && (
                     <div className="bg-zinc-800/60 px-4 py-3 space-y-3">
                       <div className="grid grid-cols-3 gap-3">
                         <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">Series</label>
+                          <label className="text-zinc-500 text-xs mb-1 block">Cantidad</label>
                           <input type="number" value={formEdit.series} onChange={e => setFormEdit({ ...formEdit, series: Number(e.target.value) })}
                             className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" min={1} max={10} />
                         </div>
                         <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">Repeticiones</label>
+                          <label className="text-zinc-500 text-xs mb-1 block">Detalle</label>
                           <input type="text" value={formEdit.repeticiones} onChange={e => setFormEdit({ ...formEdit, repeticiones: e.target.value })}
                             className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" />
                         </div>
                         <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">Descanso (seg)</label>
+                          <label className="text-zinc-500 text-xs mb-1 block">Duración (seg)</label>
                           <input type="number" value={formEdit.descanso_seg} onChange={e => setFormEdit({ ...formEdit, descanso_seg: Number(e.target.value) })}
                             className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" min={0} step={15} />
                         </div>
@@ -285,7 +283,7 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
                       <div>
                         <label className="text-zinc-500 text-xs mb-1 block">Notas</label>
                         <input type="text" value={formEdit.notas} onChange={e => setFormEdit({ ...formEdit, notas: e.target.value })}
-                          className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" placeholder="Peso sugerido, tecnica..." />
+                          className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" placeholder="Indicaciones, peso sugerido..." />
                       </div>
                       <div className="flex gap-3">
                         <button onClick={() => guardarEdicionEj(ej.id)} disabled={guardando}
@@ -304,4 +302,4 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
       </div>
     </div>
   )
-} 
+}

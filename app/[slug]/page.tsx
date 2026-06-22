@@ -19,21 +19,28 @@ interface Turno {
   estado: string
 }
 
+interface AlumnoVencido {
+  id: string
+  nombre: string
+  telefono: string
+  ultimoPago: string | null
+  diasVencido: number
+}
+
 export default function DashboardPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = React.use(params)
   const router = useRouter()
   const [profeNombre, setProfeNombre] = React.useState('')
   const [alumnos, setAlumnos] = React.useState<Alumno[]>([])
   const [turnos, setTurnos] = React.useState<Turno[]>([])
+  const [ingresosMes, setIngresosMes] = React.useState(0)
+  const [alumnosVencidos, setAlumnosVencidos] = React.useState<AlumnoVencido[]>([])
   const [loading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
     const nombre = localStorage.getItem('cf_profe_nombre')
     const profeSlug = localStorage.getItem('cf_profe_slug')
-    if (!profeSlug || profeSlug !== slug) {
-      router.push('/')
-      return
-    }
+    if (!profeSlug || profeSlug !== slug) { router.push('/'); return }
     setProfeNombre(nombre || '')
     cargarDatos()
   }, [slug])
@@ -61,9 +68,65 @@ export default function DashboardPage({ params }: { params: Promise<{ slug: stri
       .lt('fecha_hora', manana.toISOString())
       .order('fecha_hora', { ascending: true })
 
+    // Ingresos del mes actual
+    const primeroDeMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]
+    const hoyStr = new Date().toISOString().split('T')[0]
+    const { data: pagosData } = await supabase
+      .from('cf_pagos')
+      .select('monto')
+      .eq('profe_id', profeId)
+      .gte('fecha', primeroDeMes)
+      .lte('fecha', hoyStr)
+
+    const totalMes = (pagosData || []).reduce((acc: number, p: any) => acc + Number(p.monto), 0)
+    setIngresosMes(totalMes)
+
+    // Alumnos con cuota vencida (último pago > 35 días o sin pago)
+    if (alumnosData && alumnosData.length > 0) {
+      const alumnoIds = alumnosData.map((a: Alumno) => a.id)
+      const { data: pagosAlumnos } = await supabase
+        .from('cf_pagos')
+        .select('alumno_id, fecha')
+        .in('alumno_id', alumnoIds)
+        .order('fecha', { ascending: false })
+
+      // Último pago por alumno
+      const ultimoPagoMap: Record<string, string> = {}
+      ;(pagosAlumnos || []).forEach((p: any) => {
+        if (!ultimoPagoMap[p.alumno_id]) ultimoPagoMap[p.alumno_id] = p.fecha
+      })
+
+      const ahora = new Date()
+      const vencidos: AlumnoVencido[] = []
+      ;(alumnosData || []).forEach((a: Alumno) => {
+        const ultimoPago = ultimoPagoMap[a.id] || null
+        let diasVencido = 0
+        if (!ultimoPago) {
+          diasVencido = 999
+        } else {
+          const fechaPago = new Date(ultimoPago + 'T12:00:00')
+          diasVencido = Math.floor((ahora.getTime() - fechaPago.getTime()) / (1000 * 60 * 60 * 24))
+        }
+        if (diasVencido > 35) {
+          vencidos.push({ id: a.id, nombre: a.nombre, telefono: a.telefono, ultimoPago, diasVencido })
+        }
+      })
+      vencidos.sort((a, b) => b.diasVencido - a.diasVencido)
+      setAlumnosVencidos(vencidos)
+    }
+
     setAlumnos(alumnosData || [])
     setTurnos(turnosData || [])
     setLoading(false)
+  }
+
+  function formatPesos(n: number) {
+    return '$' + n.toLocaleString('es-AR')
+  }
+
+  function diasTexto(dias: number) {
+    if (dias >= 999) return 'Sin pagos'
+    return dias + ' días vencido'
   }
 
   const hoy = new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -84,9 +147,9 @@ export default function DashboardPage({ params }: { params: Promise<{ slug: stri
           <span className="text-zinc-300 text-sm">{profeNombre}</span>
         </div>
         <div className="flex items-center gap-4 text-sm">
-          <button onClick={() => router.push(`/${slug}/alumnos`)} className="text-zinc-400 hover:text-white transition-colors">Alumnos</button>
-          <button onClick={() => router.push(`/${slug}/rutinas`)} className="text-zinc-400 hover:text-white transition-colors">Rutinas</button>
-          <button onClick={() => router.push(`/${slug}/turnos`)} className="text-zinc-400 hover:text-white transition-colors">Turnos</button>
+          <button onClick={() => router.push('/' + slug + '/alumnos')} className="text-zinc-400 hover:text-white transition-colors">Alumnos</button>
+          <button onClick={() => router.push('/' + slug + '/rutinas')} className="text-zinc-400 hover:text-white transition-colors">Rutinas</button>
+          <button onClick={() => router.push('/' + slug + '/turnos')} className="text-zinc-400 hover:text-white transition-colors">Turnos</button>
           <button onClick={() => router.push('/' + slug + '/pagos')} className="text-zinc-400 hover:text-white transition-colors">Pagos</button>
           <button onClick={() => { localStorage.clear(); router.push('/') }} className="text-zinc-600 hover:text-red-400 transition-colors">Salir</button>
         </div>
@@ -99,7 +162,8 @@ export default function DashboardPage({ params }: { params: Promise<{ slug: stri
           <p className="text-zinc-500 text-sm mt-1 capitalize">{hoy}</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        {/* KPIs */}
+        <div className="grid grid-cols-2 gap-4 mb-4 sm:grid-cols-4">
           <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
             <p className="text-zinc-500 text-xs mb-1">Alumnos activos</p>
             <p className="text-3xl font-semibold text-white">{alumnos.length}</p>
@@ -109,15 +173,47 @@ export default function DashboardPage({ params }: { params: Promise<{ slug: stri
             <p className="text-3xl font-semibold text-violet-400">{turnos.length}</p>
           </div>
           <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
-            <p className="text-zinc-500 text-xs mb-1">Tu link de acceso</p>
-            <p className="text-xs text-violet-400 truncate">coachflow/{slug}</p>
+            <p className="text-zinc-500 text-xs mb-1">Ingresos del mes</p>
+            <p className="text-2xl font-semibold text-emerald-400">{formatPesos(ingresosMes)}</p>
+          </div>
+          <div className={`rounded-xl p-5 border ${alumnosVencidos.length > 0 ? 'bg-red-950/30 border-red-900/50' : 'bg-zinc-900 border-zinc-800'}`}>
+            <p className="text-zinc-500 text-xs mb-1">Cuotas vencidas</p>
+            <p className={`text-3xl font-semibold ${alumnosVencidos.length > 0 ? 'text-red-400' : 'text-zinc-500'}`}>{alumnosVencidos.length}</p>
           </div>
         </div>
 
+        {/* Alerta cuotas vencidas */}
+        {alumnosVencidos.length > 0 && (
+          <div className="bg-zinc-900 border border-red-900/40 rounded-xl p-5 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-medium text-red-400">⚠️ Alumnos con cuota vencida</h2>
+              <button onClick={() => router.push('/' + slug + '/pagos')} className="text-xs text-zinc-500 hover:text-white">Ver pagos →</button>
+            </div>
+            <div className="space-y-2">
+              {alumnosVencidos.map(a => (
+                <div key={a.id} className="flex items-center justify-between py-2 border-b border-zinc-800 last:border-0">
+                  <div>
+                    <p className="text-sm text-white">{a.nombre}</p>
+                    <p className="text-xs text-red-400/70">{diasTexto(a.diasVencido)}</p>
+                  </div>
+                  {a.telefono && (
+                    <a href={'https://wa.me/54' + a.telefono + '?text=Hola ' + a.nombre + ', te recuerdo que tu cuota está vencida. ¿Cuándo podés renovar? 🙏'}
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-xs bg-green-900/40 text-green-400 hover:bg-green-900/60 px-3 py-1.5 rounded-lg transition-colors">
+                      WA cobro
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Turnos de hoy */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-zinc-300">Turnos de hoy</h2>
-            <button onClick={() => router.push(`/${slug}/turnos`)} className="text-xs text-violet-400 hover:text-violet-300">Ver todos →</button>
+            <button onClick={() => router.push('/' + slug + '/turnos')} className="text-xs text-violet-400 hover:text-violet-300">Ver todos →</button>
           </div>
           {turnos.length === 0 ? (
             <p className="text-zinc-600 text-sm">Sin turnos para hoy</p>
@@ -134,15 +230,16 @@ export default function DashboardPage({ params }: { params: Promise<{ slug: stri
               ))}
             </div>
           )}
-          <button onClick={() => router.push(`/${slug}/turnos`)} className="mt-4 w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-sm font-medium transition-colors">
+          <button onClick={() => router.push('/' + slug + '/turnos')} className="mt-4 w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-sm font-medium transition-colors">
             + Nuevo turno
           </button>
         </div>
 
+        {/* Alumnos recientes */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-zinc-300">Alumnos recientes</h2>
-            <button onClick={() => router.push(`/${slug}/alumnos`)} className="text-xs text-violet-400 hover:text-violet-300">Ver todos →</button>
+            <button onClick={() => router.push('/' + slug + '/alumnos')} className="text-xs text-violet-400 hover:text-violet-300">Ver todos →</button>
           </div>
           {alumnos.length === 0 ? (
             <p className="text-zinc-600 text-sm">Sin alumnos todavía</p>
@@ -164,7 +261,7 @@ export default function DashboardPage({ params }: { params: Promise<{ slug: stri
               ))}
             </div>
           )}
-          <button onClick={() => router.push(`/${slug}/alumnos`)} className="mt-4 w-full py-2 rounded-lg border border-zinc-700 hover:border-zinc-600 text-sm text-zinc-400 hover:text-white transition-colors">
+          <button onClick={() => router.push('/' + slug + '/alumnos')} className="mt-4 w-full py-2 rounded-lg border border-zinc-700 hover:border-zinc-600 text-sm text-zinc-400 hover:text-white transition-colors">
             + Nuevo alumno
           </button>
         </div>
