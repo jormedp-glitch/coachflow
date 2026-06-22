@@ -190,9 +190,9 @@ export default function LoginPage() {
                   <p className="text-white font-medium text-lg">¡Cuenta creada!</p>
                   <p className="text-zinc-400 text-sm mt-1">Tu usuario es <span className="text-violet-400 font-medium">{regSlug}</span></p>
                 </div>
-                <button onClick={() => { setVista('login'); setSlug(regSlug); setRegistroOk(false) }}
+                <button onClick={() => router.push('/onboarding')}
                   className="w-full bg-violet-600 hover:bg-violet-500 text-white font-medium py-3 rounded-lg text-sm transition-colors">
-                  Ir al login
+                  Ver cómo funciona →
                 </button>
               </div>
             ) : (
