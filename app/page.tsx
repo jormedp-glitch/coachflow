@@ -113,8 +113,7 @@ export default function LoginPage() {
       deporte: regDeporte,
       email: regEmail.trim() || null,
       telefono: regTelefono.trim() || null,
-      activo: true,
-    })
+       })
 
     if (error) {
       setErrorReg('Error al crear la cuenta. Intentá de nuevo.')
