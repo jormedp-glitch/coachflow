@@ -70,6 +70,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   const [editando, setEditando] = React.useState<string | null>(null)
   const [progresando, setProgresando] = React.useState<string | null>(null)
   const [rutinaSeleccionada, setRutinaSeleccionada] = React.useState('')
+  const [linkCopiado, setLinkCopiado] = React.useState<string | null>(null)
   const [form, setForm] = React.useState({ nombre: '', telefono: '', email: '', objetivo: '', notas: '', altura_cm: '' })
   const [formEdit, setFormEdit] = React.useState({ nombre: '', telefono: '', email: '', objetivo: '', notas: '', altura_cm: '' })
   const [formProgreso, setFormProgreso] = React.useState({
@@ -256,7 +257,25 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   }
 
   function linkAlumno(codigo: string) { return window.location.origin + '/alumno/' + codigo }
-  function copiarLink(codigo: string) { navigator.clipboard.writeText(linkAlumno(codigo)) }
+
+  async function copiarLink(alumnoId: string, codigo: string) {
+    const url = linkAlumno(codigo)
+    try {
+      await navigator.clipboard.writeText(url)
+      setLinkCopiado(alumnoId)
+      setTimeout(() => setLinkCopiado(null), 2000)
+    } catch {
+      // Fallback para navegadores que bloquean clipboard
+      const input = document.createElement('input')
+      input.value = url
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+      setLinkCopiado(alumnoId)
+      setTimeout(() => setLinkCopiado(null), 2000)
+    }
+  }
 
   if (loading) return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -384,9 +403,10 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                       className={`text-xs px-2 py-1 rounded border transition-colors ${progresando === a.id ? 'text-emerald-300 border-emerald-700' : 'text-zinc-400 hover:text-white border-zinc-700'}`}>
                       📊 {progresosMap[a.id]?.length ? progresosMap[a.id].length + ' med.' : 'Progreso'}
                     </button>
-                    <button onClick={() => copiarLink(a.codigo_acceso)}
-                      className="text-xs text-violet-400 hover:text-violet-300 px-2 py-1 rounded border border-zinc-700 transition-colors">
-                      Link
+                    <button
+                      onClick={() => copiarLink(a.id, a.codigo_acceso)}
+                      className={`text-xs px-2 py-1 rounded border transition-colors ${linkCopiado === a.id ? 'text-emerald-400 border-emerald-700' : 'text-violet-400 hover:text-violet-300 border-zinc-700'}`}>
+                      {linkCopiado === a.id ? '✓ Copiado' : 'Link'}
                     </button>
                     {a.telefono && (
                       <a href={'https://wa.me/54' + a.telefono + '?text=Hola ' + a.nombre + ', te mando tu link de CoachFlow: ' + linkAlumno(a.codigo_acceso)}
@@ -471,7 +491,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                   <div className="border-t border-zinc-800 p-4 bg-zinc-800/50 space-y-4">
                     <p className="text-xs font-medium text-zinc-400">Progreso físico</p>
 
-                    {/* IMC actual si hay datos */}
                     {(() => {
                       const progs = progresosMap[a.id]
                       if (!progs || progs.length === 0 || !a.altura_cm) return null
@@ -489,7 +508,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                       )
                     })()}
 
-                    {/* Formulario nueva medición */}
                     <div className="bg-zinc-800 rounded-lg p-3 space-y-3">
                       <p className="text-xs text-zinc-500">Nueva medición</p>
 
@@ -534,7 +552,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                         </div>
                       </div>
 
-                      {/* Métricas libres para cualquier deporte */}
                       <div className="border-t border-zinc-700 pt-3">
                         <p className="text-zinc-600 text-xs mb-2">Métricas personalizadas (ej: Tiempo 5K, Velocidad de saque...)</p>
                         <div className="grid grid-cols-2 gap-2">
@@ -572,7 +589,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                       </button>
                     </div>
 
-                    {/* Historial */}
                     {progresosMap[a.id]?.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-xs text-zinc-500">Historial</p>
