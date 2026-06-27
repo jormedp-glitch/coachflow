@@ -146,7 +146,6 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
       const set = new Set((compData || []).map((c: any) => c.rutina_ejercicio_id))
       setCompletados(set)
 
-      // Historial de días con entrenamientos completados
       const { data: historialComp } = await supabase
         .from('cf_completados')
         .select('fecha')
@@ -170,7 +169,6 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
       .order('fecha', { ascending: false })
     setProgreso(progData || [])
 
-    // Pagos del alumno
     const { data: pagosData } = await supabase
       .from('cf_pagos')
       .select('*')
@@ -260,13 +258,11 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
 
       <div className="max-w-2xl mx-auto px-4 py-6">
 
-        {/* Estado de pago */}
         <div className={'border rounded-xl px-4 py-3 mb-5 flex items-center justify-between ' + (pago.color === 'text-red-400' ? 'bg-red-950/20 border-red-900/40' : 'bg-zinc-900 border-zinc-800')}>
           <p className="text-xs text-zinc-500">Estado de cuenta</p>
           <p className={'text-xs font-medium ' + pago.color}>{pago.texto}</p>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
           <button onClick={() => setSeccion('rutina')}
             className={'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ' + (seccion === 'rutina' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400')}>
@@ -299,22 +295,25 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-5">
                   <p className="text-xs text-zinc-500 mb-1">Tu plan actual</p>
                   <p className="text-white font-medium">{asignacion.rutina.nombre}</p>
-                  <p className="text-zinc-500 text-xs mt-1">{asignacion.rutina.semanas_total} semanas · Semana actual: {asignacion.semana_actual}</p>
-{asignacion.semana_actual < asignacion.rutina.semanas_total && (
-  <button
-    onClick={async () => {
-      await supabase.from('cf_asignaciones')
-        .update({ semana_actual: asignacion.semana_actual + 1 })
-        .eq('id', asignacion.id)
-      cargarDatos()
-    }}
-    className="mt-2 text-xs text-violet-400 hover:text-violet-300 border border-violet-800 hover:border-violet-600 px-3 py-1 rounded-lg transition-colors">
-    ▶ Avanzar a semana {asignacion.semana_actual + 1}
-  </button>
-)}
-{asignacion.semana_actual === asignacion.rutina.semanas_total && (
-  <p className="text-xs text-emerald-400 mt-2">🎉 ¡Completaste todas las semanas del plan!</p>
-)}
+                  {/* CAMBIO: semanas → sesiones, Semana actual → Sesión actual */}
+                  <p className="text-zinc-500 text-xs mt-1">{asignacion.rutina.semanas_total} sesiones · Sesión actual: {asignacion.semana_actual}</p>
+                  {asignacion.semana_actual < asignacion.rutina.semanas_total && (
+                    <button
+                      onClick={async () => {
+                        await supabase.from('cf_asignaciones')
+                          .update({ semana_actual: asignacion.semana_actual + 1 })
+                          .eq('id', asignacion.id)
+                        cargarDatos()
+                      }}
+                      className="mt-2 text-xs text-violet-400 hover:text-violet-300 border border-violet-800 hover:border-violet-600 px-3 py-1 rounded-lg transition-colors">
+                      {/* CAMBIO: semana → sesión */}
+                      ▶ Avanzar a sesión {asignacion.semana_actual + 1}
+                    </button>
+                  )}
+                  {asignacion.semana_actual === asignacion.rutina.semanas_total && (
+                    /* CAMBIO: semanas → sesiones */
+                    <p className="text-xs text-emerald-400 mt-2">🎉 ¡Completaste todas las sesiones del plan!</p>
+                  )}
                   {totalEj > 0 && (
                     <div className="mt-3">
                       <div className="flex justify-between text-xs mb-1">
@@ -329,12 +328,13 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
                   )}
                 </div>
 
+                {/* CAMBIO: tabs Semana → Sesión */}
                 <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
                   {Array.from({ length: asignacion.rutina.semanas_total }, (_, i) => i + 1).map(n => (
                     <button key={n} onClick={() => setSemanaVista(n)}
                       className={'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ' +
                         (semanaVista === n ? 'bg-violet-600 text-white' : n === asignacion.semana_actual ? 'bg-zinc-700 text-violet-300 border border-violet-700' : 'bg-zinc-800 text-zinc-400')}>
-                      Semana {n}
+                      Sesión {n}
                       {n === asignacion.semana_actual && <span className="ml-1 text-xs">←</span>}
                     </button>
                   ))}
@@ -343,7 +343,8 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
                 <div className="space-y-3">
                   {!semanaActual || semanaActual.ejercicios.length === 0 ? (
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center">
-                      <p className="text-zinc-500 text-sm">Sin actividades en esta semana todavia.</p>
+                      {/* CAMBIO: semana → sesión */}
+                      <p className="text-zinc-500 text-sm">Sin actividades en esta sesión todavia.</p>
                     </div>
                   ) : (
                     semanaActual.ejercicios.map((ej, idx) => {
