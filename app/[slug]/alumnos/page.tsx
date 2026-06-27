@@ -71,6 +71,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   const [progresando, setProgresando] = React.useState<string | null>(null)
   const [rutinaSeleccionada, setRutinaSeleccionada] = React.useState('')
   const [linkCopiado, setLinkCopiado] = React.useState<string | null>(null)
+  const [errorForm, setErrorForm] = React.useState('')
   const [form, setForm] = React.useState({ nombre: '', telefono: '', email: '', objetivo: '', notas: '', altura_cm: '' })
   const [formEdit, setFormEdit] = React.useState({ nombre: '', telefono: '', email: '', objetivo: '', notas: '', altura_cm: '' })
   const [formProgreso, setFormProgreso] = React.useState({
@@ -138,19 +139,24 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   async function guardarAlumno() {
     if (!form.nombre.trim()) return
     setGuardando(true)
+    setErrorForm('')
     const profeId = localStorage.getItem('cf_profe_id')
-    const { error } = await supabase.from('cf_alumnos').insert({
+    const payload = {
       profe_id: profeId,
       nombre: form.nombre.trim(),
-      telefono: form.telefono.trim(),
-      email: form.email.trim(),
-      objetivo: form.objetivo.trim(),
-      notas: form.notas.trim(),
+      telefono: form.telefono.trim() || null,
+      email: form.email.trim() || null,
+      objetivo: form.objetivo.trim() || null,
+      notas: form.notas.trim() || null,
       altura_cm: form.altura_cm ? Number(form.altura_cm) : null,
       codigo_acceso: generarCodigo(),
       estado: 'activo'
-    })
-    if (!error) {
+    }
+    const { error } = await supabase.from('cf_alumnos').insert(payload)
+    if (error) {
+      console.error('Error guardar alumno:', JSON.stringify(error))
+      setErrorForm('Error: ' + error.message + ' (código: ' + error.code + ')')
+    } else {
       setForm({ nombre: '', telefono: '', email: '', objetivo: '', notas: '', altura_cm: '' })
       setMostrarForm(false)
       cargarDatos()
@@ -163,10 +169,10 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
     setGuardando(true)
     const { error } = await supabase.from('cf_alumnos').update({
       nombre: formEdit.nombre.trim(),
-      telefono: formEdit.telefono.trim(),
-      email: formEdit.email.trim(),
-      objetivo: formEdit.objetivo.trim(),
-      notas: formEdit.notas.trim(),
+      telefono: formEdit.telefono.trim() || null,
+      email: formEdit.email.trim() || null,
+      objetivo: formEdit.objetivo.trim() || null,
+      notas: formEdit.notas.trim() || null,
       altura_cm: formEdit.altura_cm ? Number(formEdit.altura_cm) : null
     }).eq('id', alumnoId)
     if (!error) { setEditando(null); cargarDatos() }
@@ -265,7 +271,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
       setLinkCopiado(alumnoId)
       setTimeout(() => setLinkCopiado(null), 2000)
     } catch {
-      // Fallback para navegadores que bloquean clipboard
       const input = document.createElement('input')
       input.value = url
       document.body.appendChild(input)
@@ -300,7 +305,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
             <h1 className="text-2xl font-semibold">Alumnos</h1>
             <p className="text-zinc-500 text-sm mt-1">{alumnos.length} en total</p>
           </div>
-          <button onClick={() => setMostrarForm(!mostrarForm)}
+          <button onClick={() => { setMostrarForm(!mostrarForm); setErrorForm('') }}
             className="bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             + Nuevo alumno
           </button>
@@ -341,12 +346,17 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
               <textarea value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })}
                 className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none" rows={2} />
             </div>
+            {errorForm && (
+              <div className="bg-red-950/40 border border-red-900/50 rounded-lg px-4 py-3">
+                <p className="text-red-400 text-xs">{errorForm}</p>
+              </div>
+            )}
             <div className="flex gap-3">
               <button onClick={guardarAlumno} disabled={guardando}
                 className="bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
                 {guardando ? 'Guardando...' : 'Guardar alumno'}
               </button>
-              <button onClick={() => setMostrarForm(false)} className="text-zinc-500 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">Cancelar</button>
+              <button onClick={() => { setMostrarForm(false); setErrorForm('') }} className="text-zinc-500 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">Cancelar</button>
             </div>
           </div>
         )}
@@ -360,7 +370,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
             alumnos.map(a => (
               <div key={a.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
 
-                {/* Fila principal */}
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-violet-900 flex items-center justify-center text-sm font-medium text-violet-300">
@@ -381,9 +390,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                         const ultimo = progs[0]
                         const imc = calcularIMC(ultimo.peso, a.altura_cm)
                         if (!imc) return null
-                        return (
-                          <p className={'text-xs mt-0.5 ' + imc.color}>IMC {imc.valor} · {imc.categoria}</p>
-                        )
+                        return <p className={'text-xs mt-0.5 ' + imc.color}>IMC {imc.valor} · {imc.categoria}</p>
                       })()}
                     </div>
                   </div>
@@ -403,8 +410,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                       className={`text-xs px-2 py-1 rounded border transition-colors ${progresando === a.id ? 'text-emerald-300 border-emerald-700' : 'text-zinc-400 hover:text-white border-zinc-700'}`}>
                       📊 {progresosMap[a.id]?.length ? progresosMap[a.id].length + ' med.' : 'Progreso'}
                     </button>
-                    <button
-                      onClick={() => copiarLink(a.id, a.codigo_acceso)}
+                    <button onClick={() => copiarLink(a.id, a.codigo_acceso)}
                       className={`text-xs px-2 py-1 rounded border transition-colors ${linkCopiado === a.id ? 'text-emerald-400 border-emerald-700' : 'text-violet-400 hover:text-violet-300 border-zinc-700'}`}>
                       {linkCopiado === a.id ? '✓ Copiado' : 'Link'}
                     </button>
@@ -422,7 +428,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                   </div>
                 </div>
 
-                {/* Panel editar */}
                 {editando === a.id && (
                   <div className="border-t border-zinc-800 p-4 bg-zinc-800/50 space-y-3">
                     <p className="text-xs font-medium text-zinc-400">Editar alumno</p>
@@ -468,7 +473,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                   </div>
                 )}
 
-                {/* Panel asignar rutina */}
                 {asignando === a.id && (
                   <div className="border-t border-zinc-800 px-4 py-3 bg-zinc-800/50 flex items-center gap-3">
                     <span className="text-xs text-zinc-400 whitespace-nowrap">Asignar rutina:</span>
@@ -486,7 +490,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                   </div>
                 )}
 
-                {/* Panel progreso */}
                 {progresando === a.id && (
                   <div className="border-t border-zinc-800 p-4 bg-zinc-800/50 space-y-4">
                     <p className="text-xs font-medium text-zinc-400">Progreso físico</p>
@@ -510,7 +513,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
 
                     <div className="bg-zinc-800 rounded-lg p-3 space-y-3">
                       <p className="text-xs text-zinc-500">Nueva medición</p>
-
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                         <div>
                           <label className="text-zinc-500 text-xs mb-1 block">Fecha</label>
@@ -533,7 +535,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                             className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="90" />
                         </div>
                       </div>
-
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <label className="text-zinc-500 text-xs mb-1 block">% Grasa corporal</label>
@@ -551,9 +552,8 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                             className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="35" />
                         </div>
                       </div>
-
                       <div className="border-t border-zinc-700 pt-3">
-                        <p className="text-zinc-600 text-xs mb-2">Métricas personalizadas (ej: Tiempo 5K, Velocidad de saque...)</p>
+                        <p className="text-zinc-600 text-xs mb-2">Métricas personalizadas</p>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="text-zinc-500 text-xs mb-1 block">Métrica 1 — Nombre</label>
@@ -577,7 +577,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                           </div>
                         </div>
                       </div>
-
                       <div>
                         <label className="text-zinc-500 text-xs mb-1 block">Notas</label>
                         <input type="text" value={formProgreso.notas} onChange={e => setFormProgreso({ ...formProgreso, notas: e.target.value })}
