@@ -59,7 +59,11 @@ export default function AdminPage() {
   async function eliminar(profeId: string, nombre: string) {
     if (!confirm('¿Eliminar a ' + nombre + '? Esta acción no se puede deshacer.')) return
     setAccionando(profeId)
-    await supabase.from('cf_profes').delete().eq('id', profeId)
+    const { error } = await supabase.from('cf_profes').delete().eq('id', profeId)
+    if (error) {
+      console.error('Error eliminar:', JSON.stringify(error))
+      alert('Error: ' + error.message + ' / código: ' + error.code)
+    }
     await cargarProfes()
     setAccionando(null)
   }
@@ -210,7 +214,7 @@ export default function AdminPage() {
                       </a>
                     )}
                     <button onClick={() => eliminar(p.id, p.nombre)} disabled={accionando === p.id}
-                      className="text-xs text-red-500 hover:text-red-400 px-2 py-1.5 rounded border border-zinc-700 hover:border-red-800 transition-colors">
+                      className="text-xs text-red-500 hover:text-red-400 px-2 py-1.5 rounded border border-zinc-700 hover:border-red-800 transition-colors disabled:opacity-50">
                       ✕
                     </button>
                   </div>
