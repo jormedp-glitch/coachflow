@@ -162,14 +162,16 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold">{rutinaNombre}</h1>
-          <p className="text-zinc-500 text-sm mt-1">{semanasTotal} semanas · Click en una semana para editarla</p>
+          {/* CAMBIO: semanas → sesiones */}
+          <p className="text-zinc-500 text-sm mt-1">{semanasTotal} sesiones · Click en una sesión para editarla</p>
         </div>
 
+        {/* CAMBIO: tabs de Semana → Sesión */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {semanas.map(s => (
             <button key={s.numero_semana} onClick={() => { setSemanaActiva(s.numero_semana); setEditandoEj(null) }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${semanaActiva === s.numero_semana ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}>
-              Semana {s.numero_semana}
+              Sesión {s.numero_semana}
               {s.ejercicios.length > 0 && <span className="ml-2 text-xs opacity-70">({s.ejercicios.length})</span>}
             </button>
           ))}
@@ -177,7 +179,8 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-medium text-zinc-300">Semana {semanaActiva}</h2>
+            {/* CAMBIO: header Semana → Sesión */}
+            <h2 className="text-sm font-medium text-zinc-300">Sesión {semanaActiva}</h2>
             <button onClick={() => { setMostrarSelector(!mostrarSelector); setEditandoEj(null) }}
               className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
               + Agregar actividad
@@ -228,8 +231,9 @@ export default function RutinaDetallePage({ params }: { params: Promise<{ slug: 
             </div>
           )}
 
+          {/* CAMBIO: mensaje vacío */}
           {!semanaActual || semanaActual.ejercicios.length === 0 ? (
-            <p className="text-zinc-600 text-sm">Sin actividades en esta semana. ¡Agregá la primera!</p>
+            <p className="text-zinc-600 text-sm">Sin actividades en esta sesión. ¡Agregá la primera!</p>
           ) : (
             <div className="space-y-1">
               {semanaActual.ejercicios.map((ej, idx) => (
