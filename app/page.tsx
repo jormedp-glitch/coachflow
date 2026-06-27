@@ -49,11 +49,16 @@ export default function LoginPage() {
       .from('cf_profes')
       .select('*')
       .eq('slug', slug.toLowerCase().trim())
-      .eq('activo', true)
       .single()
 
     if (error || !data) {
       setErrorLogin('No se encontró el usuario. Revisá el nombre de usuario.')
+      setLoadingLogin(false)
+      return
+    }
+
+    if (!data.activo) {
+      setErrorLogin('Tu cuenta está pendiente de activación. Contactá al administrador.')
       setLoadingLogin(false)
       return
     }
@@ -93,7 +98,6 @@ export default function LoginPage() {
 
     setLoadingReg(true)
 
-    // Verificar si el slug ya existe
     const { data: existente } = await supabase
       .from('cf_profes')
       .select('id')
@@ -113,7 +117,7 @@ export default function LoginPage() {
       deporte: regDeporte,
       email: regEmail.trim() || null,
       telefono: regTelefono.trim() || null,
-       })
+    })
 
     if (error) {
       setErrorReg('Error al crear la cuenta. Intentá de nuevo.')
