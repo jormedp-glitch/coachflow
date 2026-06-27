@@ -175,13 +175,15 @@ export default function RutinasPage({ params }: { params: Promise<{ slug: string
                   <div>
                     <label className="text-zinc-500 text-xs mb-1 block">Nombre *</label>
                     <input type="text" value={formRutina.nombre} onChange={e => setFormRutina({ ...formRutina, nombre: e.target.value })}
-                      className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none focus:border-zinc-500" placeholder="Fuerza 4 semanas" />
+                      className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none focus:border-zinc-500" placeholder="Fuerza 3 sesiones" />
                   </div>
                   <div>
-                    <label className="text-zinc-500 text-xs mb-1 block">Cantidad de semanas</label>
+                    {/* CAMBIO: Cantidad de semanas → Cantidad de sesiones */}
+                    <label className="text-zinc-500 text-xs mb-1 block">Cantidad de sesiones</label>
                     <select value={formRutina.semanas_total} onChange={e => setFormRutina({ ...formRutina, semanas_total: Number(e.target.value) })}
                       className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none">
-                      {[2,3,4,6,8,12].map(n => <option key={n} value={n}>{n} semanas</option>)}
+                      {/* CAMBIO: semanas → sesiones en las opciones */}
+                      {[2,3,4,5,6,7].map(n => <option key={n} value={n}>{n} sesiones</option>)}
                     </select>
                   </div>
                 </div>
@@ -210,12 +212,13 @@ export default function RutinasPage({ params }: { params: Promise<{ slug: string
                     <div className="p-4 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-white">{r.nombre}</p>
-                        <p className="text-xs text-zinc-500">{r.semanas_total} semanas · {r.descripcion || 'Sin descripcion'}</p>
+                        {/* CAMBIO: semanas → sesiones en la card */}
+                        <p className="text-xs text-zinc-500">{r.semanas_total} sesiones · {r.descripcion || 'Sin descripcion'}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button onClick={() => router.push('/' + slug + '/rutinas/' + r.id)}
                           className="text-xs text-violet-400 hover:text-violet-300 px-3 py-1 rounded border border-zinc-700 hover:border-zinc-600 transition-colors">
-                          Ver ejercicios →
+                          Ver sesiones →
                         </button>
                         <button onClick={() => abrirEditarRutina(r)}
                           className={`text-xs px-2 py-1 rounded border transition-colors ${editandoRutina === r.id ? 'text-violet-300 border-violet-700' : 'text-zinc-400 hover:text-white border-zinc-700'}`}>
@@ -237,10 +240,11 @@ export default function RutinasPage({ params }: { params: Promise<{ slug: string
                               className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" />
                           </div>
                           <div>
-                            <label className="text-zinc-500 text-xs mb-1 block">Semanas</label>
+                            {/* CAMBIO: Semanas → Sesiones en el form de edición */}
+                            <label className="text-zinc-500 text-xs mb-1 block">Sesiones</label>
                             <select value={formEditRutina.semanas_total} onChange={e => setFormEditRutina({ ...formEditRutina, semanas_total: Number(e.target.value) })}
                               className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none">
-                              {[2,3,4,6,8,12].map(n => <option key={n} value={n}>{n} semanas</option>)}
+                              {[2,3,4,5,6,7].map(n => <option key={n} value={n}>{n} sesiones</option>)}
                             </select>
                           </div>
                           <div className="col-span-2">
