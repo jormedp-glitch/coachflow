@@ -80,6 +80,84 @@ const FORM_PROGRESO_VACIO: FormProgreso = {
   notas: ''
 }
 
+// ⚠️ IMPORTANTE: este componente está FUERA de AlumnosPage para evitar que
+// React lo destruya y recree en cada keystroke (lo que causaba perder el foco)
+function FormProgresoFields({ f, setF }: { f: FormProgreso; setF: (v: FormProgreso) => void }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div>
+          <label className="text-zinc-500 text-xs mb-1 block">Fecha</label>
+          <input type="date" value={f.fecha} onChange={e => setF({ ...f, fecha: e.target.value })}
+            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-xs mb-1 block">Peso (kg) <span className="text-red-400">*</span></label>
+          <input type="number" value={f.peso} onChange={e => setF({ ...f, peso: e.target.value })}
+            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="70" step="0.1" />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-xs mb-1 block">Cintura (cm)</label>
+          <input type="number" value={f.cintura} onChange={e => setF({ ...f, cintura: e.target.value })}
+            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="80" />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-xs mb-1 block">Cadera (cm)</label>
+          <input type="number" value={f.cadera} onChange={e => setF({ ...f, cadera: e.target.value })}
+            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="90" />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <label className="text-zinc-500 text-xs mb-1 block">% Grasa corporal</label>
+          <input type="number" value={f.porcentaje_grasa} onChange={e => setF({ ...f, porcentaje_grasa: e.target.value })}
+            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="20" step="0.1" />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-xs mb-1 block">Pecho (cm)</label>
+          <input type="number" value={f.pecho_cm} onChange={e => setF({ ...f, pecho_cm: e.target.value })}
+            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="95" />
+        </div>
+        <div>
+          <label className="text-zinc-500 text-xs mb-1 block">Bícep (cm)</label>
+          <input type="number" value={f.bicep_cm} onChange={e => setF({ ...f, bicep_cm: e.target.value })}
+            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="35" />
+        </div>
+      </div>
+      <div className="border-t border-zinc-700 pt-3">
+        <p className="text-zinc-600 text-xs mb-2">Métricas personalizadas</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Métrica 1 — Nombre</label>
+            <input type="text" value={f.metrica1_nombre} onChange={e => setF({ ...f, metrica1_nombre: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="Tiempo 5K" />
+          </div>
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Métrica 1 — Valor</label>
+            <input type="number" value={f.metrica1_valor} onChange={e => setF({ ...f, metrica1_valor: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="28.5" step="0.1" />
+          </div>
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Métrica 2 — Nombre</label>
+            <input type="text" value={f.metrica2_nombre} onChange={e => setF({ ...f, metrica2_nombre: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="FC reposo" />
+          </div>
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Métrica 2 — Valor</label>
+            <input type="number" value={f.metrica2_valor} onChange={e => setF({ ...f, metrica2_valor: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="62" step="0.1" />
+          </div>
+        </div>
+      </div>
+      <div>
+        <label className="text-zinc-500 text-xs mb-1 block">Notas</label>
+        <input type="text" value={f.notas} onChange={e => setF({ ...f, notas: e.target.value })}
+          className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="Observaciones..." />
+      </div>
+    </div>
+  )
+}
+
 export default function AlumnosPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = React.use(params)
   const router = useRouter()
@@ -112,21 +190,16 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   async function cargarDatos() {
     const profeId = localStorage.getItem('cf_profe_id')
     if (!profeId) return
-
     const [{ data: aData }, { data: rData }] = await Promise.all([
       supabase.from('cf_alumnos').select('*').eq('profe_id', profeId).order('created_at', { ascending: false }),
       supabase.from('cf_rutinas').select('id, nombre, semanas_total').eq('profe_id', profeId).order('nombre')
     ])
-
     setAlumnos(aData || [])
     setRutinas(rData || [])
-
     if (aData && aData.length > 0) {
       const alumnoIds = aData.map((a: Alumno) => a.id)
-
       const { data: asigData } = await supabase
         .from('cf_asignaciones').select('id, alumno_id, rutina_id').in('alumno_id', alumnoIds)
-
       if (asigData && asigData.length > 0) {
         const rutinaIds = asigData.map((a: any) => a.rutina_id)
         const { data: rutinasData } = await supabase
@@ -140,7 +213,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
         })
         setAsignaciones(map)
       }
-
       const { data: progData } = await supabase
         .from('cf_progreso').select('*').in('alumno_id', alumnoIds).order('fecha', { ascending: false })
       const progMap: Record<string, Progreso[]> = {}
@@ -150,7 +222,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
       })
       setProgresosMap(progMap)
     }
-
     setLoading(false)
   }
 
@@ -158,10 +229,9 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
 
   async function guardarAlumno() {
     if (!form.nombre.trim()) return
-    setGuardando(true)
-    setErrorForm('')
+    setGuardando(true); setErrorForm('')
     const profeId = localStorage.getItem('cf_profe_id')
-    const payload = {
+    const { error } = await supabase.from('cf_alumnos').insert({
       profe_id: profeId,
       nombre: form.nombre.trim(),
       telefono: form.telefono.trim() || null,
@@ -171,10 +241,8 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
       altura_cm: form.altura_cm ? Number(form.altura_cm) : null,
       codigo_acceso: generarCodigo(),
       estado: 'activo'
-    }
-    const { error } = await supabase.from('cf_alumnos').insert(payload)
+    })
     if (error) {
-      console.error('Error guardar alumno:', JSON.stringify(error))
       setErrorForm('Error: ' + error.message + ' (código: ' + error.code + ')')
     } else {
       setForm({ nombre: '', telefono: '', email: '', objetivo: '', notas: '', altura_cm: '' })
@@ -238,16 +306,13 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   }
 
   async function guardarProgreso(alumnoId: string) {
-    // Solo requiere peso (campo mínimo útil)
     if (!formProgreso.peso) {
       setErrorProgreso('El peso es obligatorio para guardar una medición.')
       return
     }
-    setErrorProgreso('')
-    setGuardando(true)
+    setErrorProgreso(''); setGuardando(true)
     const { error } = await supabase.from('cf_progreso').insert(progresoPayload(formProgreso, alumnoId))
     if (error) {
-      console.error('Error guardar progreso:', JSON.stringify(error))
       setErrorProgreso('Error al guardar: ' + error.message)
     } else {
       setFormProgreso({ ...FORM_PROGRESO_VACIO })
@@ -257,17 +322,11 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   }
 
   async function guardarEdicionProgreso(progresoId: string) {
-    if (!formEditProgreso.peso) {
-      return
-    }
+    if (!formEditProgreso.peso) return
     setGuardando(true)
     const { error } = await supabase.from('cf_progreso').update(progresoPayload(formEditProgreso)).eq('id', progresoId)
-    if (!error) {
-      setEditandoProgreso(null)
-      cargarDatos()
-    } else {
-      console.error('Error editar progreso:', JSON.stringify(error))
-    }
+    if (!error) { setEditandoProgreso(null); cargarDatos() }
+    else console.error('Error editar progreso:', JSON.stringify(error))
     setGuardando(false)
   }
 
@@ -315,8 +374,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   function abrirProgreso(alumnoId: string) {
     if (progresando === alumnoId) { setProgresando(null); return }
     setProgresando(alumnoId); setEditando(null); setAsignando(null)
-    setErrorProgreso('')
-    setEditandoProgreso(null)
+    setErrorProgreso(''); setEditandoProgreso(null)
   }
 
   function formatFecha(fecha: string) {
@@ -329,8 +387,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
     const url = linkAlumno(codigo)
     try {
       await navigator.clipboard.writeText(url)
-      setLinkCopiado(alumnoId)
-      setTimeout(() => setLinkCopiado(null), 2000)
     } catch {
       const input = document.createElement('input')
       input.value = url
@@ -338,85 +394,9 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
       input.select()
       document.execCommand('copy')
       document.body.removeChild(input)
-      setLinkCopiado(alumnoId)
-      setTimeout(() => setLinkCopiado(null), 2000)
     }
-  }
-
-  function FormProgresoFields({ f, setF }: { f: FormProgreso; setF: (v: FormProgreso) => void }) {
-    return (
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <div>
-            <label className="text-zinc-500 text-xs mb-1 block">Fecha</label>
-            <input type="date" value={f.fecha} onChange={e => setF({ ...f, fecha: e.target.value })}
-              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" />
-          </div>
-          <div>
-            <label className="text-zinc-500 text-xs mb-1 block">Peso (kg) <span className="text-red-400">*</span></label>
-            <input type="number" value={f.peso} onChange={e => setF({ ...f, peso: e.target.value })}
-              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="70" step="0.1" />
-          </div>
-          <div>
-            <label className="text-zinc-500 text-xs mb-1 block">Cintura (cm)</label>
-            <input type="number" value={f.cintura} onChange={e => setF({ ...f, cintura: e.target.value })}
-              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="80" />
-          </div>
-          <div>
-            <label className="text-zinc-500 text-xs mb-1 block">Cadera (cm)</label>
-            <input type="number" value={f.cadera} onChange={e => setF({ ...f, cadera: e.target.value })}
-              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="90" />
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <label className="text-zinc-500 text-xs mb-1 block">% Grasa corporal</label>
-            <input type="number" value={f.porcentaje_grasa} onChange={e => setF({ ...f, porcentaje_grasa: e.target.value })}
-              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="20" step="0.1" />
-          </div>
-          <div>
-            <label className="text-zinc-500 text-xs mb-1 block">Pecho (cm)</label>
-            <input type="number" value={f.pecho_cm} onChange={e => setF({ ...f, pecho_cm: e.target.value })}
-              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="95" />
-          </div>
-          <div>
-            <label className="text-zinc-500 text-xs mb-1 block">Bícep (cm)</label>
-            <input type="number" value={f.bicep_cm} onChange={e => setF({ ...f, bicep_cm: e.target.value })}
-              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="35" />
-          </div>
-        </div>
-        <div className="border-t border-zinc-700 pt-3">
-          <p className="text-zinc-600 text-xs mb-2">Métricas personalizadas</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-zinc-500 text-xs mb-1 block">Métrica 1 — Nombre</label>
-              <input type="text" value={f.metrica1_nombre} onChange={e => setF({ ...f, metrica1_nombre: e.target.value })}
-                className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="Tiempo 5K" />
-            </div>
-            <div>
-              <label className="text-zinc-500 text-xs mb-1 block">Métrica 1 — Valor</label>
-              <input type="number" value={f.metrica1_valor} onChange={e => setF({ ...f, metrica1_valor: e.target.value })}
-                className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="28.5" step="0.1" />
-            </div>
-            <div>
-              <label className="text-zinc-500 text-xs mb-1 block">Métrica 2 — Nombre</label>
-              <input type="text" value={f.metrica2_nombre} onChange={e => setF({ ...f, metrica2_nombre: e.target.value })}
-                className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="FC reposo" />
-            </div>
-            <div>
-              <label className="text-zinc-500 text-xs mb-1 block">Métrica 2 — Valor</label>
-              <input type="number" value={f.metrica2_valor} onChange={e => setF({ ...f, metrica2_valor: e.target.value })}
-                className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="62" step="0.1" />
-            </div>
-          </div>
-        </div>
-        <div>
-          <label className="text-zinc-500 text-xs mb-1 block">Notas</label>
-          <input type="text" value={f.notas} onChange={e => setF({ ...f, notas: e.target.value })}
-            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="Observaciones..." />
-        </div>
-      </div>
-    )
+    setLinkCopiado(alumnoId)
+    setTimeout(() => setLinkCopiado(null), 2000)
   }
 
   if (loading) return (
@@ -493,7 +473,8 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                 className="bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
                 {guardando ? 'Guardando...' : 'Guardar alumno'}
               </button>
-              <button onClick={() => { setMostrarForm(false); setErrorForm('') }} className="text-zinc-500 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">Cancelar</button>
+              <button onClick={() => { setMostrarForm(false); setErrorForm('') }}
+                className="text-zinc-500 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">Cancelar</button>
             </div>
           </div>
         )}
@@ -507,6 +488,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
             alumnos.map(a => (
               <div key={a.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
 
+                {/* FILA PRINCIPAL */}
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-violet-900 flex items-center justify-center text-sm font-medium text-violet-300">
@@ -524,8 +506,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                       {(() => {
                         const progs = progresosMap[a.id]
                         if (!progs || progs.length === 0 || !a.altura_cm) return null
-                        const ultimo = progs[0]
-                        const imc = calcularIMC(ultimo.peso, a.altura_cm)
+                        const imc = calcularIMC(progs[0].peso, a.altura_cm)
                         if (!imc) return null
                         return <p className={'text-xs mt-0.5 ' + imc.color}>IMC {imc.valor} · {imc.categoria}</p>
                       })()}
@@ -565,6 +546,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                   </div>
                 </div>
 
+                {/* EDITAR ALUMNO */}
                 {editando === a.id && (
                   <div className="border-t border-zinc-800 p-4 bg-zinc-800/50 space-y-3">
                     <p className="text-xs font-medium text-zinc-400">Editar alumno</p>
@@ -610,6 +592,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                   </div>
                 )}
 
+                {/* ASIGNAR RUTINA */}
                 {asignando === a.id && (
                   <div className="border-t border-zinc-800 px-4 py-3 bg-zinc-800/50 flex items-center gap-3">
                     <span className="text-xs text-zinc-400 whitespace-nowrap">Asignar rutina:</span>
@@ -627,6 +610,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                   </div>
                 )}
 
+                {/* PROGRESO */}
                 {progresando === a.id && (
                   <div className="border-t border-zinc-800 p-4 bg-zinc-800/50 space-y-4">
                     <p className="text-xs font-medium text-zinc-400">Progreso físico</p>
@@ -634,13 +618,12 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                     {(() => {
                       const progs = progresosMap[a.id]
                       if (!progs || progs.length === 0 || !a.altura_cm) return null
-                      const ultimo = progs[0]
-                      const imc = calcularIMC(ultimo.peso, a.altura_cm)
+                      const imc = calcularIMC(progs[0].peso, a.altura_cm)
                       if (!imc) return null
                       return (
                         <div className="bg-zinc-800 rounded-lg px-4 py-3 flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-zinc-500 mb-0.5">IMC actual ({formatFecha(ultimo.fecha)})</p>
+                            <p className="text-xs text-zinc-500 mb-0.5">IMC actual ({formatFecha(progs[0].fecha)})</p>
                             <p className={'text-2xl font-semibold ' + imc.color}>{imc.valor}</p>
                           </div>
                           <span className={'text-sm font-medium px-3 py-1 rounded-full bg-zinc-700 ' + imc.color}>{imc.categoria}</span>
@@ -648,16 +631,14 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                       )
                     })()}
 
-                    {/* FORMULARIO NUEVA MEDICIÓN */}
+                    {/* NUEVA MEDICIÓN */}
                     <div className="bg-zinc-800 rounded-lg p-3 space-y-3">
-                      <p className="text-xs text-zinc-500">Nueva medición <span className="text-zinc-600">— solo el peso es obligatorio (<span className="text-red-400">*</span>)</span></p>
+                      <p className="text-xs text-zinc-500">
+                        Nueva medición <span className="text-zinc-600">— solo el peso es obligatorio (<span className="text-red-400">*</span>)</span>
+                      </p>
                       <FormProgresoFields f={formProgreso} setF={setFormProgreso} />
-                      {errorProgreso && (
-                        <p className="text-red-400 text-xs">{errorProgreso}</p>
-                      )}
-                      <button
-                        onClick={() => guardarProgreso(a.id)}
-                        disabled={guardando}
+                      {errorProgreso && <p className="text-red-400 text-xs">{errorProgreso}</p>}
+                      <button onClick={() => guardarProgreso(a.id)} disabled={guardando}
                         className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-lg disabled:opacity-50 transition-colors">
                         {guardando ? 'Guardando...' : '+ Guardar medición'}
                       </button>
@@ -678,8 +659,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                                   {idx === 0 && <span className="text-xs bg-emerald-900/40 text-emerald-400 px-1.5 py-0.5 rounded">última</span>}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => abrirEditarProgreso(p)}
+                                  <button onClick={() => abrirEditarProgreso(p)}
                                     className={`text-xs px-2 py-0.5 rounded border transition-colors ${estaEditando ? 'text-violet-300 border-violet-700' : 'text-zinc-500 hover:text-white border-zinc-700'}`}>
                                     {estaEditando ? 'Cerrar' : '✏️'}
                                   </button>
@@ -688,7 +668,6 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                                 </div>
                               </div>
 
-                              {/* Resumen compacto */}
                               {!estaEditando && (
                                 <div className="flex flex-wrap gap-3 text-xs">
                                   {p.peso && <span className="text-white font-medium">{p.peso}kg</span>}
@@ -704,14 +683,11 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                                 </div>
                               )}
 
-                              {/* Formulario de edición inline */}
                               {estaEditando && (
                                 <div className="mt-3 space-y-3">
                                   <FormProgresoFields f={formEditProgreso} setF={setFormEditProgreso} />
                                   <div className="flex gap-2">
-                                    <button
-                                      onClick={() => guardarEdicionProgreso(p.id)}
-                                      disabled={guardando}
+                                    <button onClick={() => guardarEdicionProgreso(p.id)} disabled={guardando}
                                       className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors">
                                       {guardando ? 'Guardando...' : 'Guardar cambios'}
                                     </button>
