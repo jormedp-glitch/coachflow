@@ -299,12 +299,28 @@ export default function PortalAlumnoPage({ params }: { params: Promise<{ codigo:
                   <p className="text-zinc-500 text-xs mt-1">{asignacion.rutina.semanas_total} sesiones · Sesión actual: {asignacion.semana_actual}</p>
                   {asignacion.semana_actual < asignacion.rutina.semanas_total && (
                     <button
-                      onClick={async () => {
-                        await supabase.from('cf_asignaciones')
-                          .update({ semana_actual: asignacion.semana_actual + 1 })
-                          .eq('id', asignacion.id)
-                        cargarDatos()
-                      }}
+ onClick={async () => {
+  // Auto-marcar todas las actividades de la sesión actual
+  const hoy = new Date().toISOString().split('T')[0]
+  const ejActuales = semanaActual?.ejercicios || []
+  if (ejActuales.length > 0 && alumno) {
+    const inserts = ejActuales.map(ej => ({
+      alumno_id: alumno.id,
+      rutina_ejercicio_id: ej.id,
+      fecha: hoy
+    }))
+    // upsert para no duplicar si ya marcó algo manualmente
+    await supabase.from('cf_completados').upsert(inserts, {
+      onConflict: 'alumno_id,rutina_ejercicio_id,fecha',
+      ignoreDuplicates: true
+    })
+  }
+  // Avanzar sesión
+  await supabase.from('cf_asignaciones')
+    .update({ semana_actual: asignacion.semana_actual + 1 })
+    .eq('id', asignacion.id)
+  cargarDatos()
+}}
                       className="mt-2 text-xs text-violet-400 hover:text-violet-300 border border-violet-800 hover:border-violet-600 px-3 py-1 rounded-lg transition-colors">
                       {/* CAMBIO: semana → sesión */}
                       ▶ Avanzar a sesión {asignacion.semana_actual + 1}
