@@ -45,6 +45,21 @@ interface Progreso {
   notas: string
 }
 
+type FormProgreso = {
+  fecha: string
+  peso: string
+  cintura: string
+  cadera: string
+  porcentaje_grasa: string
+  pecho_cm: string
+  bicep_cm: string
+  metrica1_nombre: string
+  metrica1_valor: string
+  metrica2_nombre: string
+  metrica2_valor: string
+  notas: string
+}
+
 function calcularIMC(peso: number, altura_cm: number | null): { valor: number; categoria: string; color: string } | null {
   if (!altura_cm || !peso) return null
   const altura_m = altura_cm / 100
@@ -54,6 +69,15 @@ function calcularIMC(peso: number, altura_cm: number | null): { valor: number; c
   if (imc < 25) return { valor, categoria: 'Normal', color: 'text-green-400' }
   if (imc < 30) return { valor, categoria: 'Sobrepeso', color: 'text-yellow-400' }
   return { valor, categoria: 'Obesidad', color: 'text-red-400' }
+}
+
+const FORM_PROGRESO_VACIO: FormProgreso = {
+  fecha: new Date().toISOString().split('T')[0],
+  peso: '', cintura: '', cadera: '',
+  porcentaje_grasa: '', pecho_cm: '', bicep_cm: '',
+  metrica1_nombre: '', metrica1_valor: '',
+  metrica2_nombre: '', metrica2_valor: '',
+  notas: ''
 }
 
 export default function AlumnosPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -69,19 +93,15 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   const [asignando, setAsignando] = React.useState<string | null>(null)
   const [editando, setEditando] = React.useState<string | null>(null)
   const [progresando, setProgresando] = React.useState<string | null>(null)
+  const [editandoProgreso, setEditandoProgreso] = React.useState<string | null>(null)
   const [rutinaSeleccionada, setRutinaSeleccionada] = React.useState('')
   const [linkCopiado, setLinkCopiado] = React.useState<string | null>(null)
   const [errorForm, setErrorForm] = React.useState('')
+  const [errorProgreso, setErrorProgreso] = React.useState('')
   const [form, setForm] = React.useState({ nombre: '', telefono: '', email: '', objetivo: '', notas: '', altura_cm: '' })
   const [formEdit, setFormEdit] = React.useState({ nombre: '', telefono: '', email: '', objetivo: '', notas: '', altura_cm: '' })
-  const [formProgreso, setFormProgreso] = React.useState({
-    fecha: new Date().toISOString().split('T')[0],
-    peso: '', cintura: '', cadera: '',
-    porcentaje_grasa: '', pecho_cm: '', bicep_cm: '',
-    metrica1_nombre: '', metrica1_valor: '',
-    metrica2_nombre: '', metrica2_valor: '',
-    notas: ''
-  })
+  const [formProgreso, setFormProgreso] = React.useState<FormProgreso>({ ...FORM_PROGRESO_VACIO })
+  const [formEditProgreso, setFormEditProgreso] = React.useState<FormProgreso>({ ...FORM_PROGRESO_VACIO })
 
   React.useEffect(() => {
     const profeSlug = localStorage.getItem('cf_profe_slug')
@@ -199,34 +219,54 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
     setGuardando(false)
   }
 
+  function progresoPayload(f: FormProgreso, alumnoId?: string) {
+    return {
+      ...(alumnoId ? { alumno_id: alumnoId } : {}),
+      fecha: f.fecha,
+      peso: f.peso ? Number(f.peso) : null,
+      cintura: f.cintura ? Number(f.cintura) : null,
+      cadera: f.cadera ? Number(f.cadera) : null,
+      porcentaje_grasa: f.porcentaje_grasa ? Number(f.porcentaje_grasa) : null,
+      pecho_cm: f.pecho_cm ? Number(f.pecho_cm) : null,
+      bicep_cm: f.bicep_cm ? Number(f.bicep_cm) : null,
+      metrica1_nombre: f.metrica1_nombre.trim() || null,
+      metrica1_valor: f.metrica1_valor ? Number(f.metrica1_valor) : null,
+      metrica2_nombre: f.metrica2_nombre.trim() || null,
+      metrica2_valor: f.metrica2_valor ? Number(f.metrica2_valor) : null,
+      notas: f.notas.trim() || null
+    }
+  }
+
   async function guardarProgreso(alumnoId: string) {
-    if (!formProgreso.peso && !formProgreso.cintura && !formProgreso.cadera) return
+    // Solo requiere peso (campo mínimo útil)
+    if (!formProgreso.peso) {
+      setErrorProgreso('El peso es obligatorio para guardar una medición.')
+      return
+    }
+    setErrorProgreso('')
     setGuardando(true)
-    const { error } = await supabase.from('cf_progreso').insert({
-      alumno_id: alumnoId,
-      fecha: formProgreso.fecha,
-      peso: formProgreso.peso ? Number(formProgreso.peso) : null,
-      cintura: formProgreso.cintura ? Number(formProgreso.cintura) : null,
-      cadera: formProgreso.cadera ? Number(formProgreso.cadera) : null,
-      porcentaje_grasa: formProgreso.porcentaje_grasa ? Number(formProgreso.porcentaje_grasa) : null,
-      pecho_cm: formProgreso.pecho_cm ? Number(formProgreso.pecho_cm) : null,
-      bicep_cm: formProgreso.bicep_cm ? Number(formProgreso.bicep_cm) : null,
-      metrica1_nombre: formProgreso.metrica1_nombre.trim() || null,
-      metrica1_valor: formProgreso.metrica1_valor ? Number(formProgreso.metrica1_valor) : null,
-      metrica2_nombre: formProgreso.metrica2_nombre.trim() || null,
-      metrica2_valor: formProgreso.metrica2_valor ? Number(formProgreso.metrica2_valor) : null,
-      notas: formProgreso.notas.trim()
-    })
-    if (!error) {
-      setFormProgreso({
-        fecha: new Date().toISOString().split('T')[0],
-        peso: '', cintura: '', cadera: '',
-        porcentaje_grasa: '', pecho_cm: '', bicep_cm: '',
-        metrica1_nombre: '', metrica1_valor: '',
-        metrica2_nombre: '', metrica2_valor: '',
-        notas: ''
-      })
+    const { error } = await supabase.from('cf_progreso').insert(progresoPayload(formProgreso, alumnoId))
+    if (error) {
+      console.error('Error guardar progreso:', JSON.stringify(error))
+      setErrorProgreso('Error al guardar: ' + error.message)
+    } else {
+      setFormProgreso({ ...FORM_PROGRESO_VACIO })
       cargarDatos()
+    }
+    setGuardando(false)
+  }
+
+  async function guardarEdicionProgreso(progresoId: string) {
+    if (!formEditProgreso.peso) {
+      return
+    }
+    setGuardando(true)
+    const { error } = await supabase.from('cf_progreso').update(progresoPayload(formEditProgreso)).eq('id', progresoId)
+    if (!error) {
+      setEditandoProgreso(null)
+      cargarDatos()
+    } else {
+      console.error('Error editar progreso:', JSON.stringify(error))
     }
     setGuardando(false)
   }
@@ -235,6 +275,25 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
     if (!confirm('¿Eliminar esta medición?')) return
     await supabase.from('cf_progreso').delete().eq('id', progresoId)
     cargarDatos()
+  }
+
+  function abrirEditarProgreso(p: Progreso) {
+    if (editandoProgreso === p.id) { setEditandoProgreso(null); return }
+    setEditandoProgreso(p.id)
+    setFormEditProgreso({
+      fecha: p.fecha,
+      peso: p.peso ? String(p.peso) : '',
+      cintura: p.cintura ? String(p.cintura) : '',
+      cadera: p.cadera ? String(p.cadera) : '',
+      porcentaje_grasa: p.porcentaje_grasa ? String(p.porcentaje_grasa) : '',
+      pecho_cm: p.pecho_cm ? String(p.pecho_cm) : '',
+      bicep_cm: p.bicep_cm ? String(p.bicep_cm) : '',
+      metrica1_nombre: p.metrica1_nombre || '',
+      metrica1_valor: p.metrica1_valor ? String(p.metrica1_valor) : '',
+      metrica2_nombre: p.metrica2_nombre || '',
+      metrica2_valor: p.metrica2_valor ? String(p.metrica2_valor) : '',
+      notas: p.notas || ''
+    })
   }
 
   function abrirEditar(a: Alumno) {
@@ -256,6 +315,8 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
   function abrirProgreso(alumnoId: string) {
     if (progresando === alumnoId) { setProgresando(null); return }
     setProgresando(alumnoId); setEditando(null); setAsignando(null)
+    setErrorProgreso('')
+    setEditandoProgreso(null)
   }
 
   function formatFecha(fecha: string) {
@@ -280,6 +341,82 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
       setLinkCopiado(alumnoId)
       setTimeout(() => setLinkCopiado(null), 2000)
     }
+  }
+
+  function FormProgresoFields({ f, setF }: { f: FormProgreso; setF: (v: FormProgreso) => void }) {
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Fecha</label>
+            <input type="date" value={f.fecha} onChange={e => setF({ ...f, fecha: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" />
+          </div>
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Peso (kg) <span className="text-red-400">*</span></label>
+            <input type="number" value={f.peso} onChange={e => setF({ ...f, peso: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="70" step="0.1" />
+          </div>
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Cintura (cm)</label>
+            <input type="number" value={f.cintura} onChange={e => setF({ ...f, cintura: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="80" />
+          </div>
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Cadera (cm)</label>
+            <input type="number" value={f.cadera} onChange={e => setF({ ...f, cadera: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="90" />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">% Grasa corporal</label>
+            <input type="number" value={f.porcentaje_grasa} onChange={e => setF({ ...f, porcentaje_grasa: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="20" step="0.1" />
+          </div>
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Pecho (cm)</label>
+            <input type="number" value={f.pecho_cm} onChange={e => setF({ ...f, pecho_cm: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="95" />
+          </div>
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Bícep (cm)</label>
+            <input type="number" value={f.bicep_cm} onChange={e => setF({ ...f, bicep_cm: e.target.value })}
+              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="35" />
+          </div>
+        </div>
+        <div className="border-t border-zinc-700 pt-3">
+          <p className="text-zinc-600 text-xs mb-2">Métricas personalizadas</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-zinc-500 text-xs mb-1 block">Métrica 1 — Nombre</label>
+              <input type="text" value={f.metrica1_nombre} onChange={e => setF({ ...f, metrica1_nombre: e.target.value })}
+                className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="Tiempo 5K" />
+            </div>
+            <div>
+              <label className="text-zinc-500 text-xs mb-1 block">Métrica 1 — Valor</label>
+              <input type="number" value={f.metrica1_valor} onChange={e => setF({ ...f, metrica1_valor: e.target.value })}
+                className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="28.5" step="0.1" />
+            </div>
+            <div>
+              <label className="text-zinc-500 text-xs mb-1 block">Métrica 2 — Nombre</label>
+              <input type="text" value={f.metrica2_nombre} onChange={e => setF({ ...f, metrica2_nombre: e.target.value })}
+                className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="FC reposo" />
+            </div>
+            <div>
+              <label className="text-zinc-500 text-xs mb-1 block">Métrica 2 — Valor</label>
+              <input type="number" value={f.metrica2_valor} onChange={e => setF({ ...f, metrica2_valor: e.target.value })}
+                className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="62" step="0.1" />
+            </div>
+          </div>
+        </div>
+        <div>
+          <label className="text-zinc-500 text-xs mb-1 block">Notas</label>
+          <input type="text" value={f.notas} onChange={e => setF({ ...f, notas: e.target.value })}
+            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="Observaciones..." />
+        </div>
+      </div>
+    )
   }
 
   if (loading) return (
@@ -316,7 +453,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
             <h2 className="text-sm font-medium text-zinc-300">Nuevo alumno</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-zinc-500 text-xs mb-1 block">Nombre *</label>
+                <label className="text-zinc-500 text-xs mb-1 block">Nombre <span className="text-red-400">*</span></label>
                 <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
                   className="w-full bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm border border-zinc-700 focus:outline-none" placeholder="Juan Perez" />
               </div>
@@ -433,7 +570,7 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                     <p className="text-xs font-medium text-zinc-400">Editar alumno</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-zinc-500 text-xs mb-1 block">Nombre *</label>
+                        <label className="text-zinc-500 text-xs mb-1 block">Nombre <span className="text-red-400">*</span></label>
                         <input type="text" value={formEdit.nombre} onChange={e => setFormEdit({ ...formEdit, nombre: e.target.value })}
                           className="w-full bg-zinc-700 text-white rounded-lg px-3 py-2 text-sm border border-zinc-600 focus:outline-none" />
                       </div>
@@ -511,88 +648,28 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                       )
                     })()}
 
+                    {/* FORMULARIO NUEVA MEDICIÓN */}
                     <div className="bg-zinc-800 rounded-lg p-3 space-y-3">
-                      <p className="text-xs text-zinc-500">Nueva medición</p>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">Fecha</label>
-                          <input type="date" value={formProgreso.fecha} onChange={e => setFormProgreso({ ...formProgreso, fecha: e.target.value })}
-                            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" />
-                        </div>
-                        <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">Peso (kg)</label>
-                          <input type="number" value={formProgreso.peso} onChange={e => setFormProgreso({ ...formProgreso, peso: e.target.value })}
-                            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="70" step="0.1" />
-                        </div>
-                        <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">Cintura (cm)</label>
-                          <input type="number" value={formProgreso.cintura} onChange={e => setFormProgreso({ ...formProgreso, cintura: e.target.value })}
-                            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="80" />
-                        </div>
-                        <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">Cadera (cm)</label>
-                          <input type="number" value={formProgreso.cadera} onChange={e => setFormProgreso({ ...formProgreso, cadera: e.target.value })}
-                            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="90" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">% Grasa corporal</label>
-                          <input type="number" value={formProgreso.porcentaje_grasa} onChange={e => setFormProgreso({ ...formProgreso, porcentaje_grasa: e.target.value })}
-                            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="20" step="0.1" />
-                        </div>
-                        <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">Pecho (cm)</label>
-                          <input type="number" value={formProgreso.pecho_cm} onChange={e => setFormProgreso({ ...formProgreso, pecho_cm: e.target.value })}
-                            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="95" />
-                        </div>
-                        <div>
-                          <label className="text-zinc-500 text-xs mb-1 block">Bícep (cm)</label>
-                          <input type="number" value={formProgreso.bicep_cm} onChange={e => setFormProgreso({ ...formProgreso, bicep_cm: e.target.value })}
-                            className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="35" />
-                        </div>
-                      </div>
-                      <div className="border-t border-zinc-700 pt-3">
-                        <p className="text-zinc-600 text-xs mb-2">Métricas personalizadas</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-zinc-500 text-xs mb-1 block">Métrica 1 — Nombre</label>
-                            <input type="text" value={formProgreso.metrica1_nombre} onChange={e => setFormProgreso({ ...formProgreso, metrica1_nombre: e.target.value })}
-                              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="Tiempo 5K" />
-                          </div>
-                          <div>
-                            <label className="text-zinc-500 text-xs mb-1 block">Métrica 1 — Valor</label>
-                            <input type="number" value={formProgreso.metrica1_valor} onChange={e => setFormProgreso({ ...formProgreso, metrica1_valor: e.target.value })}
-                              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="28.5" step="0.1" />
-                          </div>
-                          <div>
-                            <label className="text-zinc-500 text-xs mb-1 block">Métrica 2 — Nombre</label>
-                            <input type="text" value={formProgreso.metrica2_nombre} onChange={e => setFormProgreso({ ...formProgreso, metrica2_nombre: e.target.value })}
-                              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="FC reposo" />
-                          </div>
-                          <div>
-                            <label className="text-zinc-500 text-xs mb-1 block">Métrica 2 — Valor</label>
-                            <input type="number" value={formProgreso.metrica2_valor} onChange={e => setFormProgreso({ ...formProgreso, metrica2_valor: e.target.value })}
-                              className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="62" step="0.1" />
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-zinc-500 text-xs mb-1 block">Notas</label>
-                        <input type="text" value={formProgreso.notas} onChange={e => setFormProgreso({ ...formProgreso, notas: e.target.value })}
-                          className="w-full bg-zinc-700 text-white rounded-lg px-2 py-1.5 text-xs border border-zinc-600 focus:outline-none" placeholder="Observaciones..." />
-                      </div>
-                      <button onClick={() => guardarProgreso(a.id)} disabled={guardando}
+                      <p className="text-xs text-zinc-500">Nueva medición <span className="text-zinc-600">— solo el peso es obligatorio (<span className="text-red-400">*</span>)</span></p>
+                      <FormProgresoFields f={formProgreso} setF={setFormProgreso} />
+                      {errorProgreso && (
+                        <p className="text-red-400 text-xs">{errorProgreso}</p>
+                      )}
+                      <button
+                        onClick={() => guardarProgreso(a.id)}
+                        disabled={guardando}
                         className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-lg disabled:opacity-50 transition-colors">
                         {guardando ? 'Guardando...' : '+ Guardar medición'}
                       </button>
                     </div>
 
+                    {/* HISTORIAL */}
                     {progresosMap[a.id]?.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-xs text-zinc-500">Historial</p>
                         {progresosMap[a.id].map((p, idx) => {
                           const imc = calcularIMC(p.peso, a.altura_cm)
+                          const estaEditando = editandoProgreso === p.id
                           return (
                             <div key={p.id} className="bg-zinc-800 rounded-lg px-3 py-2.5">
                               <div className="flex items-center justify-between mb-1.5">
@@ -600,21 +677,49 @@ export default function AlumnosPage({ params }: { params: Promise<{ slug: string
                                   <span className="text-xs text-zinc-500">{formatFecha(p.fecha)}</span>
                                   {idx === 0 && <span className="text-xs bg-emerald-900/40 text-emerald-400 px-1.5 py-0.5 rounded">última</span>}
                                 </div>
-                                <button onClick={() => eliminarProgreso(p.id)}
-                                  className="text-zinc-600 hover:text-red-400 text-xs transition-colors">✕</button>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => abrirEditarProgreso(p)}
+                                    className={`text-xs px-2 py-0.5 rounded border transition-colors ${estaEditando ? 'text-violet-300 border-violet-700' : 'text-zinc-500 hover:text-white border-zinc-700'}`}>
+                                    {estaEditando ? 'Cerrar' : '✏️'}
+                                  </button>
+                                  <button onClick={() => eliminarProgreso(p.id)}
+                                    className="text-zinc-600 hover:text-red-400 text-xs transition-colors">✕</button>
+                                </div>
                               </div>
-                              <div className="flex flex-wrap gap-3 text-xs">
-                                {p.peso && <span className="text-white font-medium">{p.peso}kg</span>}
-                                {imc && <span className={imc.color}>IMC {imc.valor} ({imc.categoria})</span>}
-                                {p.cintura && <span className="text-zinc-400">cin: {p.cintura}cm</span>}
-                                {p.cadera && <span className="text-zinc-400">cad: {p.cadera}cm</span>}
-                                {p.pecho_cm && <span className="text-zinc-400">pecho: {p.pecho_cm}cm</span>}
-                                {p.bicep_cm && <span className="text-zinc-400">bícep: {p.bicep_cm}cm</span>}
-                                {p.porcentaje_grasa && <span className="text-zinc-400">grasa: {p.porcentaje_grasa}%</span>}
-                                {p.metrica1_nombre && p.metrica1_valor && <span className="text-zinc-400">{p.metrica1_nombre}: {p.metrica1_valor}</span>}
-                                {p.metrica2_nombre && p.metrica2_valor && <span className="text-zinc-400">{p.metrica2_nombre}: {p.metrica2_valor}</span>}
-                              </div>
-                              {p.notas && <p className="text-zinc-600 text-xs mt-1 italic">{p.notas}</p>}
+
+                              {/* Resumen compacto */}
+                              {!estaEditando && (
+                                <div className="flex flex-wrap gap-3 text-xs">
+                                  {p.peso && <span className="text-white font-medium">{p.peso}kg</span>}
+                                  {imc && <span className={imc.color}>IMC {imc.valor} ({imc.categoria})</span>}
+                                  {p.cintura && <span className="text-zinc-400">cin: {p.cintura}cm</span>}
+                                  {p.cadera && <span className="text-zinc-400">cad: {p.cadera}cm</span>}
+                                  {p.pecho_cm && <span className="text-zinc-400">pecho: {p.pecho_cm}cm</span>}
+                                  {p.bicep_cm && <span className="text-zinc-400">bícep: {p.bicep_cm}cm</span>}
+                                  {p.porcentaje_grasa && <span className="text-zinc-400">grasa: {p.porcentaje_grasa}%</span>}
+                                  {p.metrica1_nombre && p.metrica1_valor && <span className="text-zinc-400">{p.metrica1_nombre}: {p.metrica1_valor}</span>}
+                                  {p.metrica2_nombre && p.metrica2_valor && <span className="text-zinc-400">{p.metrica2_nombre}: {p.metrica2_valor}</span>}
+                                  {p.notas && <span className="text-zinc-600 italic">{p.notas}</span>}
+                                </div>
+                              )}
+
+                              {/* Formulario de edición inline */}
+                              {estaEditando && (
+                                <div className="mt-3 space-y-3">
+                                  <FormProgresoFields f={formEditProgreso} setF={setFormEditProgreso} />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => guardarEdicionProgreso(p.id)}
+                                      disabled={guardando}
+                                      className="bg-violet-600 hover:bg-violet-500 text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors">
+                                      {guardando ? 'Guardando...' : 'Guardar cambios'}
+                                    </button>
+                                    <button onClick={() => setEditandoProgreso(null)}
+                                      className="text-zinc-500 hover:text-white text-xs px-3 py-1.5 transition-colors">Cancelar</button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )
                         })}
